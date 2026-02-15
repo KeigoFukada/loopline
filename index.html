@@ -29,18 +29,20 @@
       80%{transform:translateX(4px)}
       100%{transform:translateX(0)}
     }
-  
-    /* === Mobile layout fix (iPhone) === */
+    /* Mobile (iPhone) layout: ボタン縦積みを抑えて盤面を広くする */
     @media (max-width: 520px){
       .top{flex-direction:column;align-items:stretch;gap:8px;padding:8px 10px}
+      .left{
+        display:grid;
+        grid-template-columns:repeat(2,minmax(0,1fr));
+        gap:8px;
+        align-items:stretch;
+      }
+      .left .btn{width:100%;padding:8px 10px;font-size:13px;border-radius:10px}
+      .left .pill{grid-column:1 / -1;justify-self:start;padding:6px 8px;font-size:12px}
       #clear{align-self:flex-start}
-      .left{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:stretch}
-      .left > div{grid-column:1 / -1}
-      .btn{padding:8px 10px;font-size:13px;border-radius:10px}
-      .pill{padding:6px 8px;font-size:12px}
       canvas{min-height:55vh}
     }
-
   </style>
 </head>
 <body>
@@ -133,111 +135,142 @@
     return h >>> 0;
   }
 
-  // ---- Audio (素材なし / WebAudio) ----
-  const audio = { ctx:null, master:null, bgm:null };
+  // ---- Audio (外部ファイル / MP3・WAV) ----
+  // 置き場所：リポジトリ直下に assets/ フォルダを作って入れる
+  // 例）assets/bgm.mp3, assets/sfx_step.mp3 ...（Safari対策でMP3推奨）
+  const ASSET_VER = '1'; // 音を差し替えたのに反映されない時は数字を上げる（キャッシュ対策）
+  const audio = { unlocked:false, bgmEl:null, pools:Object.create(null) };
+
   let sfxOn = (localStorage.getItem('loopline_sfx') ?? '1') === '1';
   let bgmOn = (localStorage.getItem('loopline_bgm') ?? '0') === '1';
 
-  function ensureAudio(){
-    if(audio.ctx) return;
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    if(!Ctx) return;
-    audio.ctx = new Ctx();
-    audio.master = audio.ctx.createGain();
-    audio.master.gain.value = 0.18;
-    audio.master.connect(audio.ctx.destination);
+  const BGM_VOL = 0.22;
+  const SFX_VOL = 0.70;
+  const SFX_POOL_SIZE = 6;
+
+  const audioFiles = {
+    // BGM（ループ用）
+    bgm: './assets/bgm.mp3',
+
+    // SFX（短め推奨 0.05〜0.6s）
+    start: './assets/sfx_start.mp3',
+    step:  './assets/sfx_step.mp3',
+    undo:  './assets/sfx_undo.mp3',
+    error: './assets/sfx_error.mp3',
+    clear: './assets/sfx_clear.mp3',
+    key:   './assets/sfx_key.mp3',
+    warp:  './assets/sfx_warp.mp3',
+    gate:  './assets/sfx_gate.mp3',
+  };
+
+  function withVer(url){
+    // GitHub Pages / iPhoneキャッシュ対策
+    return url + (url.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(ASSET_VER);
   }
+
+  function ensureAudio(){
+    if(audio.bgmEl) return;
+
+    // BGM
+    const bgm = new Audio(withVer(audioFiles.bgm));
+    bgm.loop = true;
+    bgm.preload = 'auto';
+    bgm.volume = BGM_VOL;
+    bgm.playsInline = true;
+    audio.bgmEl = bgm;
+
+    // SFX pools
+    for(const [name, url] of Object.entries(audioFiles)){
+      if(name === 'bgm') continue;
+      const pool = [];
+      for(let i=0;i<SFX_POOL_SIZE;i++){
+        const a = new Audio(withVer(url));
+        a.preload = 'auto';
+        a.volume = SFX_VOL;
+        a.playsInline = true;
+        pool.push(a);
+      }
+      audio.pools[name] = pool;
+    }
+
+    // タブが非表示になったらBGM停止（復帰時は必要なら再開）
+    document.addEventListener('visibilitychange', ()=>{
+      if(!audio.bgmEl) return;
+      if(document.hidden){
+        try{ audio.bgmEl.pause(); }catch{}
+      }else{
+        if(bgmOn && audio.unlocked){
+          audio.bgmEl.play().catch(()=>{});
+        }
+      }
+    });
+  }
+
   async function resumeAudio(){
+    // iOS Safari: ユーザー操作内で一度 play() を成功させる必要がある
     ensureAudio();
-    if(audio.ctx && audio.ctx.state === 'suspended'){
-      try{ await audio.ctx.resume(); }catch{}
+    if(audio.unlocked) return;
+
+    try{
+      // 無音で一瞬だけ再生→停止（アンロック用）
+      const probe = audio.pools.start?.[0] || audio.bgmEl;
+      if(!probe) return;
+
+      const prevVol = probe.volume;
+      probe.volume = 0.0;
+      await probe.play();
+      probe.pause();
+      try{ probe.currentTime = 0; }catch{}
+      probe.volume = prevVol;
+
+      audio.unlocked = true;
+
+      // すでにBGM ONならここで開始（ユーザー操作内なので確実）
+      if(bgmOn) startBgm();
+    }catch(e){
+      // 失敗してもOK：次のユーザー操作でまた unlock を試す
     }
   }
-  function beep(freq, dur=0.06, type='sine', vol=0.12, when=0){
+
+  // 連打・同時再生に強いSFX再生
+  function playSfx(name){
     if(!sfxOn) return;
     ensureAudio();
-    if(!audio.ctx) return;
-    const t0 = audio.ctx.currentTime + when;
-    const o = audio.ctx.createOscillator();
-    const g = audio.ctx.createGain();
-    o.type = type;
-    o.frequency.setValueAtTime(freq, t0);
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.linearRampToValueAtTime(vol, t0 + 0.008);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    o.connect(g);
-    g.connect(audio.master);
-    o.start(t0);
-    o.stop(t0 + dur + 0.02);
+    const pool = audio.pools[name];
+    if(!pool || pool.length === 0) return;
+
+    // 空いてるやつを優先（なければ先頭を奪う）
+    let a = pool.find(x => x.paused || x.ended);
+    if(!a){ a = pool[0]; try{ a.pause(); }catch{} }
+
+    try{ a.currentTime = 0; }catch{}
+    a.play().catch(()=>{});
   }
+
   let lastErrAt = 0;
   function sfx(name){
     const now = performance.now();
     if(name === 'error'){
-      if(now - lastErrAt < 180) return;
+      if(now - lastErrAt < 160) return; // 連続ブザー抑制
       lastErrAt = now;
-      beep(180,0.08,'square',0.08);
-      return;
     }
-    if(name === 'start') { beep(520,0.05,'sine',0.10); beep(780,0.05,'sine',0.08,0.04); return; }
-    if(name === 'step')  { beep(640,0.035,'triangle',0.07); return; }
-    if(name === 'undo')  { beep(320,0.05,'triangle',0.06); return; }
-    if(name === 'clear') { beep(520,0.07,'sine',0.09); beep(660,0.07,'sine',0.08,0.08); beep(840,0.10,'sine',0.07,0.16); return; }
-    if(name === 'key')   { beep(900,0.05,'sine',0.06); beep(1200,0.06,'sine',0.06,0.06); return; }
-    if(name === 'warp')  { beep(420,0.04,'sine',0.06); beep(640,0.06,'triangle',0.06,0.04); return; }
-    if(name === 'gate')  { beep(520,0.05,'triangle',0.06); return; }
+    playSfx(name);
   }
 
-  
-  // ---- BGM (外部ファイル / iPhone対応) ----
-  // 置き場所：リポジトリ直下に assets/ フォルダを作って入れる
-  // 例）assets/bgm.mp3
-  // 反映されない時は、このバージョンを '2' などに上げる（キャッシュ対策）
-  const ASSET_VER = '1';
-  let bgmAudio = null;
-  function ensureBgmAudio(){
-    if(bgmAudio) return;
-    bgmAudio = new Audio(`./assets/bgm.mp3?v=${ASSET_VER}`);
-    bgmAudio.loop = true;
-    bgmAudio.preload = 'auto';
-    bgmAudio.volume = 0.28; // ちょうど良いくらい（好みで調整）
+  function startBgm(){
+    ensureAudio();
+    if(!audio.bgmEl) return;
+    // unlocked前だとiOSが弾くので、resumeAudio() 内/ユーザー操作後に呼ばれる前提
+    audio.bgmEl.volume = BGM_VOL;
+    audio.bgmEl.play().catch(()=>{});
   }
 
-  async function startBgm(){
-    ensureBgmAudio();
-    if(!bgmAudio) return;
-    try{
-      // iPhone Safari対策：ユーザー操作後に play する必要がある
-      await bgmAudio.play();
-    }catch(e){
-      // 再生がブロックされることがあるので、UI操作後にもう一度ONを押せばOK
-    }
-  }
   function stopBgm(){
-    if(!bgmAudio) return;
-    try{ bgmAudio.pause(); }catch{}
-    try{ bgmAudio.currentTime = 0; }catch{}
+    if(!audio.bgmEl) return;
+    try{ audio.bgmEl.pause(); }catch{}
+    try{ audio.bgmEl.currentTime = 0; }catch{}
   }
 
-
-  // ---- State ----
-  let W=0,H=0,DPR=1;
-  let rows=0, cols=0, total=0; // total = active nodes count
-  let cell=120, originX=0, originY=0, touchRadius=26;
-  let nodes=[]; // {id,r,c,x,y,visited,rule,active}
-
-  let isDrawing=false;
-  let startId=-1, lastId=-1;
-  let path=[];       // ids
-  let segments=[];   // [{a,b,type}]
-  let moves=0;       // segments length
-  let actions=0;     // attempt count（undoで減らさない）
-  let cleared=false;
-
-  // Timer
-  let tStart=0, tElapsed=0, timerRunning=false, timerInterval=null;
-
-  // Mode
   let mode = 'level'; // 'level' | 'endless'
   let levelIndex = 0;
 
