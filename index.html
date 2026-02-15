@@ -29,6 +29,18 @@
       80%{transform:translateX(4px)}
       100%{transform:translateX(0)}
     }
+  
+    /* === Mobile layout fix (iPhone) === */
+    @media (max-width: 520px){
+      .top{flex-direction:column;align-items:stretch;gap:8px;padding:8px 10px}
+      #clear{align-self:flex-start}
+      .left{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:stretch}
+      .left > div{grid-column:1 / -1}
+      .btn{padding:8px 10px;font-size:13px;border-radius:10px}
+      .pill{padding:6px 8px;font-size:12px}
+      canvas{min-height:55vh}
+    }
+
   </style>
 </head>
 <body>
@@ -176,58 +188,37 @@
     if(name === 'gate')  { beep(520,0.05,'triangle',0.06); return; }
   }
 
-  function startBgm(){
-    ensureAudio();
-    if(!audio.ctx || audio.bgm) return;
-    const ctxA = audio.ctx;
-    const g = ctxA.createGain();
-    g.gain.value = 0.0001;
-    g.connect(audio.master);
+  
+  // ---- BGM (外部ファイル / iPhone対応) ----
+  // 置き場所：リポジトリ直下に assets/ フォルダを作って入れる
+  // 例）assets/bgm.mp3
+  // 反映されない時は、このバージョンを '2' などに上げる（キャッシュ対策）
+  const ASSET_VER = '1';
+  let bgmAudio = null;
+  function ensureBgmAudio(){
+    if(bgmAudio) return;
+    bgmAudio = new Audio(`./assets/bgm.mp3?v=${ASSET_VER}`);
+    bgmAudio.loop = true;
+    bgmAudio.preload = 'auto';
+    bgmAudio.volume = 0.28; // ちょうど良いくらい（好みで調整）
+  }
 
-    const o1 = ctxA.createOscillator();
-    const o2 = ctxA.createOscillator();
-    o1.type = 'triangle';
-    o2.type = 'sine';
-    o1.frequency.value = 110;
-    o2.frequency.value = 165;
-
-    // LFO (ゆらぎ)
-    const lfo = ctxA.createOscillator();
-    const lfoGain = ctxA.createGain();
-    lfo.type = 'sine';
-    lfo.frequency.value = 0.12;
-    lfoGain.gain.value = 0.018;
-    lfo.connect(lfoGain);
-    lfoGain.connect(g.gain);
-
-    o1.connect(g);
-    o2.connect(g);
-
-    const t = ctxA.currentTime;
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(0.04, t + 0.4);
-
-    o1.start();
-    o2.start();
-    lfo.start();
-
-    audio.bgm = {o1,o2,lfo,g};
+  async function startBgm(){
+    ensureBgmAudio();
+    if(!bgmAudio) return;
+    try{
+      // iPhone Safari対策：ユーザー操作後に play する必要がある
+      await bgmAudio.play();
+    }catch(e){
+      // 再生がブロックされることがあるので、UI操作後にもう一度ONを押せばOK
+    }
   }
   function stopBgm(){
-    if(!audio.ctx || !audio.bgm) return;
-    const {o1,o2,lfo,g} = audio.bgm;
-    const t = audio.ctx.currentTime;
-    g.gain.cancelScheduledValues(t);
-    g.gain.setValueAtTime(g.gain.value, t);
-    g.gain.linearRampToValueAtTime(0.0001, t + 0.25);
-    setTimeout(() => {
-      try{o1.stop();}catch{}
-      try{o2.stop();}catch{}
-      try{lfo.stop();}catch{}
-      try{o1.disconnect();o2.disconnect();lfo.disconnect();g.disconnect();}catch{}
-      audio.bgm = null;
-    }, 300);
+    if(!bgmAudio) return;
+    try{ bgmAudio.pause(); }catch{}
+    try{ bgmAudio.currentTime = 0; }catch{}
   }
+
 
   // ---- State ----
   let W=0,H=0,DPR=1;
