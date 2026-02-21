@@ -3,30 +3,35 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>LoopLine</title>
+  <title>LoopLine Recovery</title>
   <meta name="theme-color" content="#0b0b0f" />
   <style>
-    :root{--bg:#0b0b0f;--panel:#12121a;--ink:#f2f3f7;--muted:#a9adbb;--good:#7CFF7C;--bad:#ff6b6b;}
-    html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans JP",sans-serif}
-    .wrap{max-width:980px;margin:0 auto;padding:10px 12px 16px}
-    .top{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--panel);border-radius:16px;padding:10px 12px}
-    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    .btn{cursor:pointer;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:var(--ink);
-      padding:10px 12px;border-radius:12px;font-weight:800;font-size:13px;user-select:none}
+    :root{
+      --bg:#0b0b0f; --panel:#151722; --ink:#f2f3f7; --muted:#a9adbb;
+      --good:#7CFF7C; --line:#d9dbe5;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans JP",sans-serif}
+    .wrap{max-width:960px;margin:0 auto;padding:10px}
+    .top{background:var(--panel);border-radius:16px;padding:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .btn{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:var(--ink);
+      padding:10px 12px;border-radius:12px;font-weight:800;font-size:13px;cursor:pointer;user-select:none}
     .btn:active{transform:translateY(1px)}
-    .btn.primary{background:rgba(124,255,124,.12);border-color:rgba(124,255,124,.25)}
-    .pill{display:inline-flex;gap:8px;align-items:center;padding:8px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);font-size:12px;font-weight:800}
+    .btn.primary{background:rgba(124,255,124,.10);border-color:rgba(124,255,124,.25)}
+    .pill{display:inline-flex;align-items:center;gap:8px;padding:8px 10px;border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);font-size:12px;font-weight:800}
     .pill input{accent-color:#9ff}
-    .stats{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px;color:var(--muted);font-weight:800}
+    #clear{font-weight:1000;color:var(--good);margin-left:4px}
+    .stats{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-weight:800;margin-top:10px}
     .hint{margin-top:6px;color:var(--muted);font-size:12px;line-height:1.45}
-    .stage{margin-top:10px;background:var(--panel);border-radius:16px;padding:10px}
-    canvas{width:100%;display:block;border-radius:14px;background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));touch-action:none}
-    #clear{font-weight:1000;color:var(--good);letter-spacing:.06em}
+    .stage{background:var(--panel);border-radius:16px;padding:10px;margin-top:10px}
+    canvas{width:100%;display:block;border-radius:14px;background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));touch-action:none}
     @media (max-width:520px){
       .top{flex-direction:column;align-items:stretch}
       .btn{padding:9px 10px;font-size:12px}
       .pill{padding:7px 9px}
-      .wrap{padding:8px 10px 14px}
     }
   </style>
 </head>
@@ -34,16 +39,15 @@
 <div class="wrap">
   <div class="top">
     <div class="row">
-      <div class="btn primary" id="btnEndless">エンドレス開始</div>
-      <div class="btn" id="btnNew">新しい盤面</div>
-      <div class="btn" id="btnRetry">リトライ</div>
-      <div class="btn" id="btnNext">次へ</div>
+      <button class="btn primary" id="btnEndless">エンドレス開始</button>
+      <button class="btn" id="btnNew">新しい盤面</button>
+      <button class="btn" id="btnRetry">リトライ</button>
+      <button class="btn" id="btnNext">次へ</button>
     </div>
     <div class="row">
-      <span class="pill"><input type="checkbox" id="togHard">HARD</span>
-      <span class="pill"><input type="checkbox" id="togHint">HINT</span>
-      <span class="pill"><input type="checkbox" id="togSfx" checked>SFX</span>
-      <span class="pill"><input type="checkbox" id="togBgm">BGM</span>
+      <label class="pill"><input type="checkbox" id="togHint">HINT</label>
+      <label class="pill"><input type="checkbox" id="togSfx" checked>SFX</label>
+      <label class="pill"><input type="checkbox" id="togBgm">BGM</label>
       <span id="clear"></span>
     </div>
   </div>
@@ -52,11 +56,11 @@
     <div>MODE: <span id="modeLabel">LEVEL</span></div>
     <div>LEVEL <span id="levelLabel">1</span></div>
     <div>Time <span id="timeLabel">00:00.0</span></div>
-    <div>/ Actions <span id="actLabel">0</span></div>
+    <div>Actions <span id="actLabel">0</span></div>
   </div>
   <div class="hint">
-    点をなぞって全部踏む → スタートに戻るとCLEAR（上下左右のみ）<br/>
-    ※音は「最初のタップ後」から鳴ります（iPhone仕様）
+    点をなぞって全部踏んで、最後にスタートへ戻るとCLEAR。<br>
+    ※ iPhoneは最初のタップ後に音が鳴ります（仕様）
   </div>
 
   <div class="stage">
@@ -66,260 +70,354 @@
 
 <script>
 (() => {
-  const ASSET_VER = "11"; // 反映されない時は数字を上げてCommit
-  const $ = (id)=>document.getElementById(id);
+  const ASSET_VER = "13"; // 反映されない時は数字を上げてCommit
+  const $ = (id) => document.getElementById(id);
 
-  // ---- audio (files) ----
+  // ========= Audio (files) =========
   const audio = (() => {
-    const enabled = { sfx:true, bgm:false };
-    const files = {
-      bgm: `assets/bgm.mp3?v=${ASSET_VER}`,
-      start: `assets/sfx_start.mp3?v=${ASSET_VER}`,
-      step: `assets/sfx_step.mp3?v=${ASSET_VER}`,
-      undo: `assets/sfx_undo.mp3?v=${ASSET_VER}`,
-      error:`assets/sfx_error.mp3?v=${ASSET_VER}`,
-      clear:`assets/sfx_clear.mp3?v=${ASSET_VER}`,
+    const enabled = { sfx: true, bgm: false };
+    let unlocked = false;
+    const path = (n) => `assets/${n}.mp3?v=${ASSET_VER}`;
+    const bgm = new Audio(path("bgm"));
+    bgm.loop = true;
+    bgm.volume = 0.55;
+
+    const map = {
+      start: "sfx_start",
+      step: "sfx_step",
+      undo: "sfx_undo",
+      error: "sfx_error",
+      clear: "sfx_clear",
     };
-    let unlocked=false;
-    const bgm = new Audio(files.bgm); bgm.loop=true; bgm.volume=0.55;
-    function play(name, vol=0.9){
-      if(!enabled.sfx || !unlocked) return;
-      try{
-        const a = new Audio(files[name]); a.volume=vol; a.play().catch(()=>{});
-      }catch{}
+
+    function play(name, volume = 0.9) {
+      if (!enabled.sfx || !unlocked) return;
+      const file = map[name];
+      if (!file) return;
+      try {
+        const a = new Audio(path(file));
+        a.volume = volume;
+        a.play().catch(() => {});
+      } catch (_) {}
     }
-    function setBgm(on){
+
+    function setBgm(on) {
       enabled.bgm = on;
-      if(!on){ bgm.pause(); return; }
-      if(!unlocked) return;
-      bgm.play().catch(()=>{});
+      if (!on) { bgm.pause(); return; }
+      if (!unlocked) return;
+      bgm.play().catch(() => {});
     }
-    function unlock(){
-      if(unlocked) return;
-      unlocked=true;
-      if(enabled.bgm) bgm.play().catch(()=>{});
+
+    function unlock() {
+      if (unlocked) return;
+      unlocked = true;
+      if (enabled.bgm) bgm.play().catch(() => {});
     }
+
     return { enabled, play, setBgm, unlock };
   })();
-  window.addEventListener("pointerdown", ()=>audio.unlock(), {passive:true});
 
-  // ---- ui ----
-  const Tog = { hard:$("togHard"), hint:$("togHint"), sfx:$("togSfx"), bgm:$("togBgm") };
-  const UI  = { mode:$("modeLabel"), level:$("levelLabel"), time:$("timeLabel"), act:$("actLabel"), clear:$("clear") };
+  window.addEventListener("pointerdown", () => audio.unlock(), { passive: true });
 
-  // ---- canvas ----
-  const cv = $("cv"); const ctx = cv.getContext("2d");
-  function resizeCanvas(){
+  // ========= UI =========
+  const UI = {
+    mode: $("modeLabel"),
+    level: $("levelLabel"),
+    time: $("timeLabel"),
+    act: $("actLabel"),
+    clear: $("clear"),
+  };
+  const Tog = {
+    hint: $("togHint"),
+    sfx: $("togSfx"),
+    bgm: $("togBgm"),
+  };
+
+  Tog.sfx.addEventListener("change", () => audio.enabled.sfx = Tog.sfx.checked);
+  Tog.bgm.addEventListener("change", () => audio.setBgm(Tog.bgm.checked));
+
+  // ========= Canvas =========
+  const cv = $("cv");
+  const ctx = cv.getContext("2d");
+
+  function resizeCanvas() {
     const rect = cv.getBoundingClientRect();
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const w = Math.max(320, Math.floor(rect.width * dpr));
-    cv.width = w; cv.height = w;
+    if (cv.width !== w || cv.height !== w) {
+      cv.width = w;
+      cv.height = w;
+    }
   }
-  window.addEventListener("resize", ()=>{ resizeCanvas(); draw(); });
+  window.addEventListener("resize", () => { resizeCanvas(); draw(); });
 
-  // ---- game (simple loopline) ----
-  const levels = [{r:2,c:4},{r:3,c:4},{r:4,c:4},{r:3,c:6},{r:4,c:6}];
-  let mode="LEVEL";
-  let levelIndex=0;
-  let rows=2, cols=4;
-  let nodes=[]; // {id,r,c,x,y,visited}
-  let startId=-1, lastId=-1;
-  let path=[]; let segments=[];
-  let actions=0;
-  let startedAt=null, timer=null;
+  // ========= Game =========
+  const levels = [
+    { r: 2, c: 4 },
+    { r: 3, c: 4 },
+    { r: 4, c: 4 },
+    { r: 3, c: 6 },
+    { r: 4, c: 6 },
+    { r: 5, c: 6 },
+  ];
 
-  function fmt(ms){
-    const s=ms/1000, m=Math.floor(s/60), rr=s-m*60;
-    return `${String(m).padStart(2,"0")}:${String(Math.floor(rr)).padStart(2,"0")}.${Math.floor((rr%1)*10)}`;
-  }
-  function tick(){
-    UI.time.textContent = startedAt ? fmt(Date.now()-startedAt) : "00:00.0";
-  }
-  function startTimer(){
-    if(startedAt) return;
-    startedAt=Date.now(); timer=setInterval(tick,100);
-  }
-  function stopTimer(){ if(timer) clearInterval(timer); timer=null; }
+  let mode = "LEVEL";
+  let levelIdx = 0;
+  let rows = 2, cols = 4;
+  let nodes = []; // {id,r,c,x,y,visited}
+  let startId = -1;
+  let lastId = -1;
+  let path = [];
+  let segments = []; // [a,b]
+  let actions = 0;
 
-  function loadLevel(r,c){
-    rows=r; cols=c;
-    nodes=[]; segments=[]; path=[]; actions=0; startedAt=null; stopTimer();
-    UI.act.textContent="0"; UI.clear.textContent="";
-    startId=-1; lastId=-1;
-    for(let rr=0;rr<rows;rr++){
-      for(let cc=0;cc<cols;cc++){
-        nodes.push({id:rr*cols+cc,r:rr,c:cc,x:0,y:0,visited:false});
+  let startedAt = null;
+  let timer = null;
+
+  function fmtTime(ms) {
+    const t = Math.max(0, ms|0);
+    const s = t / 1000;
+    const m = Math.floor(s / 60);
+    const rs = s - m * 60;
+    return `${String(m).padStart(2,"0")}:${String(Math.floor(rs)).padStart(2,"0")}.${Math.floor((rs % 1) * 10)}`;
+  }
+  function startTimer() {
+    if (startedAt) return;
+    startedAt = Date.now();
+    timer = setInterval(() => {
+      UI.time.textContent = fmtTime(Date.now() - startedAt);
+    }, 100);
+  }
+  function stopTimer() {
+    if (timer) clearInterval(timer);
+    timer = null;
+  }
+
+  function resetStats() {
+    stopTimer();
+    startedAt = null;
+    UI.time.textContent = "00:00.0";
+    actions = 0;
+    UI.act.textContent = "0";
+    UI.clear.textContent = "";
+  }
+
+  function buildLevel(r, c) {
+    rows = r; cols = c;
+    nodes = [];
+    segments = [];
+    path = [];
+    startId = -1;
+    lastId = -1;
+    resetStats();
+
+    let id = 0;
+    for (let rr = 0; rr < rows; rr++) {
+      for (let cc = 0; cc < cols; cc++) {
+        nodes.push({ id: id++, r: rr, c: cc, x: 0, y: 0, visited: false });
       }
     }
     draw();
   }
 
-  function pos(){
+  function nextLevel() {
+    levelIdx = (levelIdx + 1) % levels.length;
+    UI.level.textContent = String(levelIdx + 1);
+    const lv = levels[levelIdx];
+    buildLevel(lv.r, lv.c);
+  }
+
+  function newBoard() {
+    // 同レベルのまま、行列を少し揺らして新鮮味
+    const base = levels[levelIdx];
+    const swap = Math.random() < 0.5;
+    const r = swap ? base.r : base.r;
+    const c = swap ? base.c : base.c;
+    buildLevel(r, c);
+  }
+
+  function updateNodePixels() {
     resizeCanvas();
-    const pad = Math.round(cv.width*0.12);
-    const size = cv.width - pad*2;
-    const step = (cols>1 && rows>1) ? Math.min(size/(cols-1), size/(rows-1)) : size;
-    const ox = (cv.width - (cols-1)*step)/2;
-    const oy = (cv.height - (rows-1)*step)/2;
-    for(const n of nodes){
-      n.x = ox + n.c*step;
-      n.y = oy + n.r*step;
+    const pad = Math.round(cv.width * 0.12);
+    const usable = cv.width - pad * 2;
+    const stepX = cols > 1 ? usable / (cols - 1) : usable;
+    const stepY = rows > 1 ? usable / (rows - 1) : usable;
+    const step = Math.min(stepX, stepY);
+    const ox = (cv.width - (cols - 1) * step) / 2;
+    const oy = (cv.height - (rows - 1) * step) / 2;
+
+    for (const n of nodes) {
+      n.x = ox + n.c * step;
+      n.y = oy + n.r * step;
     }
-    return {pad,step};
+    return { step };
   }
 
-  function nearest(px,py){
-    let best=null, bd=1e18;
-    for(const n of nodes){
-      const dx=n.x-px, dy=n.y-py;
-      const d=dx*dx+dy*dy;
-      if(d<bd){ bd=d; best=n; }
-    }
-    return {n:best,d2:bd};
-  }
-  function adjacent(a,b){
-    const A=nodes[a], B=nodes[b];
-    return Math.abs(A.r-B.r)+Math.abs(A.c-B.c)===1;
-  }
-  function visitedCount(){
-    let c=0; for(const n of nodes) if(n.visited) c++; return c;
+  function adjacent(a, b) {
+    const A = nodes[a], B = nodes[b];
+    return Math.abs(A.r - B.r) + Math.abs(A.c - B.c) === 1;
   }
 
-  function tryStep(target){
-    if(!target) return;
-    if(startId<0){
+  function visitedCount() {
+    let count = 0;
+    for (const n of nodes) if (n.visited) count++;
+    return count;
+  }
+
+  function nearestNode(px, py) {
+    let best = null, bestD = Infinity;
+    for (const n of nodes) {
+      const dx = px - n.x, dy = py - n.y;
+      const d = dx * dx + dy * dy;
+      if (d < bestD) { bestD = d; best = n; }
+    }
+    return { node: best, dist2: bestD };
+  }
+
+  function tryStep(target) {
+    if (!target) return;
+    if (UI.clear.textContent === "CLEAR!") return;
+
+    if (startId < 0) {
       // start
-      startId=target.id; lastId=target.id;
-      target.visited=true;
-      path=[target.id];
-      actions++; UI.act.textContent=String(actions);
-      audio.play("start",0.9);
+      startId = target.id;
+      lastId = target.id;
+      target.visited = true;
+      path = [target.id];
+      actions++; UI.act.textContent = String(actions);
+      audio.play("start", 0.95);
       draw();
       return;
     }
 
-    // undo (one step back)
-    if(path.length>=2 && target.id===path[path.length-2]){
+    // undo (tap previous)
+    if (path.length >= 2 && target.id === path[path.length - 2]) {
+      const removed = path.pop();
+      nodes[removed].visited = false;
       segments.pop();
-      const last = path.pop();
-      nodes[last].visited=false;
-      lastId = path[path.length-1];
-      actions++; UI.act.textContent=String(actions);
-      audio.play("undo",0.85);
+      lastId = path[path.length - 1];
+      actions++; UI.act.textContent = String(actions);
+      audio.play("undo", 0.85);
       draw();
       return;
     }
 
-    // close
-    const total = rows*cols;
-    if(target.id===startId && path.length>=4 && adjacent(lastId,startId) && visitedCount()===total){
-      segments.push([lastId,startId]);
-      actions++; UI.act.textContent=String(actions);
+    const total = rows * cols;
+
+    // close loop
+    if (
+      target.id === startId &&
+      path.length >= 4 &&
+      adjacent(lastId, startId) &&
+      visitedCount() === total
+    ) {
+      segments.push([lastId, startId]);
+      actions++; UI.act.textContent = String(actions);
       stopTimer();
-      UI.clear.textContent="CLEAR!";
-      audio.play("clear",1.0);
+      UI.clear.textContent = "CLEAR!";
+      audio.play("clear", 1.0);
       draw();
-      // auto next
-      if(mode==="LEVEL"){
-        setTimeout(()=>nextLevel(), 650);
-      }
+      if (mode === "LEVEL") setTimeout(nextLevel, 650);
       return;
     }
 
-    if(target.visited) { audio.play("error",0.9); return; }
-    if(!adjacent(lastId,target.id)) { audio.play("error",0.9); return; }
+    if (target.visited) { audio.play("error", 0.9); return; }
+    if (!adjacent(lastId, target.id)) { audio.play("error", 0.9); return; }
 
-    if(path.length===1) startTimer();
-    segments.push([lastId,target.id]);
-    target.visited=true;
+    if (path.length === 1) startTimer();
+    segments.push([lastId, target.id]);
+    target.visited = true;
     path.push(target.id);
-    lastId=target.id;
-    actions++; UI.act.textContent=String(actions);
-    audio.play("step",0.75);
+    lastId = target.id;
+    actions++; UI.act.textContent = String(actions);
+    audio.play("step", 0.75);
     draw();
   }
 
-  function nextLevel(){
-    levelIndex = (levelIndex+1) % levels.length;
-    UI.level.textContent=String(levelIndex+1);
-    const lv = levels[levelIndex];
-    loadLevel(lv.r, lv.c);
-  }
+  // pointer input
+  cv.addEventListener("pointerdown", (e) => {
+    const rect = cv.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (cv.width / rect.width);
+    const y = (e.clientY - rect.top) * (cv.height / rect.height);
+    const { step } = updateNodePixels();
+    const { node, dist2 } = nearestNode(x, y);
+    const r = Math.max(14, step * 0.18);
+    if (node && dist2 <= (r * r * 5)) {
+      tryStep(node);
+    }
+  }, { passive: true });
 
-  // input
-  cv.addEventListener("pointerdown",(e)=>{
-    const rect=cv.getBoundingClientRect();
-    const x=(e.clientX-rect.left)*(cv.width/rect.width);
-    const y=(e.clientY-rect.top)*(cv.height/rect.height);
-    const {n,d2} = nearest(x,y);
-    const r = Math.max(14, cv.width*0.02);
-    if(d2 <= r*r*6) tryStep(n);
-  }, {passive:true});
+  // buttons
+  $("btnRetry").addEventListener("click", () => {
+    const lv = levels[levelIdx];
+    buildLevel(lv.r, lv.c);
+  });
+  $("btnNew").addEventListener("click", newBoard);
+  $("btnNext").addEventListener("click", nextLevel);
+  $("btnEndless").addEventListener("click", () => {
+    mode = "ENDLESS";
+    UI.mode.textContent = "ENDLESS";
+    levelIdx = 0;
+    UI.level.textContent = "1";
+    const lv = levels[levelIdx];
+    buildLevel(lv.r, lv.c);
+  });
 
-  function draw(){
-    const {step} = pos();
-    ctx.clearRect(0,0,cv.width,cv.height);
+  // render
+  function draw() {
+    if (!nodes.length) return;
+    const { step } = updateNodePixels();
+    ctx.clearRect(0, 0, cv.width, cv.height);
 
-    // segments
-    ctx.lineCap="round"; ctx.lineJoin="round";
-    ctx.lineWidth = Math.max(6, step*0.10);
-    ctx.strokeStyle = "rgba(215,217,226,.95)";
-    for(const [a,b] of segments){
-      const A=nodes[a], B=nodes[b];
-      ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.lineTo(B.x,B.y); ctx.stroke();
+    // path lines
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.lineWidth = Math.max(6, step * 0.10);
+    ctx.strokeStyle = "rgba(217,219,229,.95)";
+    for (const [a, b] of segments) {
+      const A = nodes[a], B = nodes[b];
+      ctx.beginPath();
+      ctx.moveTo(A.x, A.y);
+      ctx.lineTo(B.x, B.y);
+      ctx.stroke();
     }
 
-    // hint: next legal nodes
-    if(Tog.hint.checked && startId>=0 && UI.clear.textContent!=="CLEAR!"){
-      const cand=[];
-      for(const n of nodes){
-        if(n.visited) continue;
-        if(adjacent(lastId,n.id)) cand.push(n);
+    // hint
+    if (Tog.hint.checked && startId >= 0 && UI.clear.textContent !== "CLEAR!") {
+      ctx.globalAlpha = 0.20;
+      ctx.fillStyle = "#fff";
+      for (const n of nodes) {
+        if (n.visited) continue;
+        if (!adjacent(lastId, n.id)) continue;
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, Math.max(18, step * 0.18), 0, Math.PI * 2);
+        ctx.fill();
       }
-      ctx.globalAlpha=0.22;
-      ctx.fillStyle="#ffffff";
-      for(const n of cand){
-        ctx.beginPath(); ctx.arc(n.x,n.y,Math.max(18,step*0.16),0,Math.PI*2); ctx.fill();
-      }
-      ctx.globalAlpha=1;
+      ctx.globalAlpha = 1;
     }
 
     // nodes
-    const r = Math.max(10, step*0.14);
-    for(const n of nodes){
-      ctx.beginPath(); ctx.arc(n.x,n.y,r,0,Math.PI*2);
+    const r = Math.max(10, step * 0.14);
+    for (const n of nodes) {
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
       ctx.fillStyle = n.visited ? "rgba(255,255,255,.95)" : "rgba(255,255,255,.28)";
       ctx.fill();
-      if(n.id===startId){
-        ctx.lineWidth=Math.max(3,step*0.06);
-        ctx.strokeStyle="rgba(124,255,124,.85)";
+
+      if (n.id === startId) {
+        ctx.lineWidth = Math.max(3, step * 0.06);
+        ctx.strokeStyle = "rgba(124,255,124,.9)";
         ctx.stroke();
       }
     }
   }
 
-  // buttons
-  $("btnRetry").addEventListener("click", ()=>{
-    const lv = levels[levelIndex]; loadLevel(lv.r, lv.c);
-  });
-  $("btnNew").addEventListener("click", ()=>{
-    const lv = levels[levelIndex]; loadLevel(lv.r, lv.c);
-  });
-  $("btnNext").addEventListener("click", ()=>nextLevel());
-  $("btnEndless").addEventListener("click", ()=>{
-    mode="ENDLESS"; UI.mode.textContent="ENDLESS";
-    levelIndex=0; UI.level.textContent="1";
-    const lv = levels[0]; loadLevel(lv.r, lv.c);
-  });
-
-  Tog.sfx.addEventListener("change",()=>audio.enabled.sfx=Tog.sfx.checked);
-  Tog.bgm.addEventListener("change",()=>audio.setBgm(Tog.bgm.checked));
-
   // init
   resizeCanvas();
-  UI.mode.textContent="LEVEL";
-  UI.level.textContent="1";
-  loadLevel(levels[0].r, levels[0].c);
+  UI.mode.textContent = "LEVEL";
+  UI.level.textContent = "1";
+  const lv = levels[levelIdx];
+  buildLevel(lv.r, lv.c);
 })();
 </script>
 </body>
