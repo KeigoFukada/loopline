@@ -4,1565 +4,926 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>LoopLine Ultra</title>
+  <meta name="theme-color" content="#0b0b0f" />
   <style>
-    html,body{margin:0;height:100%;background:#0b0f17;color:#e8eefc;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
-    .wrap{height:100%;display:flex;flex-direction:column}
-    .top{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:10px 12px}
-    .left{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-    .btn{background:#1a2440;border:1px solid #2b3a66;color:#e8eefc;border-radius:12px;padding:10px 12px;font-weight:900}
-    .btn:active{transform:translateY(1px)}
-    .btn.on{background:#24325a;border-color:#4f6cff}
-    .pill{padding:6px 10px;border-radius:999px;border:1px solid #2b3a66;background:#121a31;font-weight:900}
-    canvas{flex:1;touch-action:none;display:block;width:100%}
-    .hint{opacity:.85;font-size:12px;line-height:1.2}
-    #clear{font-weight:900;opacity:0;transition:opacity .15s;white-space:nowrap}
-    .mono{font-variant-numeric:tabular-nums}
-
-    /* feedback effects */
-    #flash{position:fixed;inset:0;background:#ffffff;opacity:0;pointer-events:none;transition:opacity .12s}
-    body.shake{animation:shake .18s linear}
-    @keyframes shake{
-      0%{transform:translateX(0)}
-      20%{transform:translateX(-6px)}
-      40%{transform:translateX(6px)}
-      60%{transform:translateX(-4px)}
-      80%{transform:translateX(4px)}
-      100%{transform:translateX(0)}
+    :root{
+      --bg:#0b0b0f; --panel:#12121a; --ink:#f2f3f7; --muted:#a9adbb;
+      --accent:#6ee7ff; --good:#7CFF7C; --bad:#ff6b6b; --line:#d7d9e2;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
     }
-    /* Mobile (iPhone) layout: ボタン縦積みを抑えて盤面を広くする */
-    @media (max-width: 520px){
-      .top{flex-direction:column;align-items:stretch;gap:8px;padding:8px 10px}
-      .left{
-        display:grid;
-        grid-template-columns:repeat(2,minmax(0,1fr));
-        gap:8px;
-        align-items:stretch;
-      }
-      .left .btn{width:100%;padding:8px 10px;font-size:13px;border-radius:10px}
-      .left .pill{grid-column:1 / -1;justify-self:start;padding:6px 8px;font-size:12px}
-      #clear{align-self:flex-start}
-      canvas{min-height:55vh}
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;}
+    .wrap{max-width:980px;margin:0 auto;padding:10px 12px 16px;}
+    .top{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--panel);border-radius:16px;padding:10px 12px;box-shadow:var(--shadow);}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .btn{cursor:pointer;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:var(--ink);
+      padding:10px 12px;border-radius:12px;font-weight:700;font-size:13px;user-select:none}
+    .btn:active{transform:translateY(1px)}
+    .btn.primary{background:rgba(110,231,255,.18);border-color:rgba(110,231,255,.35)}
+    .btn.warn{background:rgba(255,107,107,.14);border-color:rgba(255,107,107,.35)}
+    .pill{display:inline-flex;gap:8px;align-items:center;padding:8px 10px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);font-size:12px;font-weight:700}
+    .pill input{accent-color:var(--accent)}
+    .stats{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px;color:var(--muted);font-weight:700}
+    .hint{margin-top:6px;color:var(--muted);font-size:12px;line-height:1.45}
+    .stage{margin-top:10px;background:var(--panel);border-radius:16px;padding:10px;box-shadow:var(--shadow);}
+    canvas{width:100%;height:auto;display:block;border-radius:14px;background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));}
+    .toast{margin-top:8px;font-weight:900;color:var(--good)}
+    .right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    #clear{font-weight:1000;color:var(--good);letter-spacing:.06em}
+    .spacer{flex:1}
+
+    /* Mobile tighten */
+    @media (max-width:520px){
+      .top{flex-direction:column;align-items:stretch}
+      .row{justify-content:space-between}
+      .btn{padding:9px 10px;font-size:12px;border-radius:11px}
+      .pill{padding:7px 9px;font-size:12px}
+      .wrap{padding:8px 10px 14px}
     }
   </style>
 </head>
 <body>
-<div id="flash"></div>
 <div class="wrap">
   <div class="top">
-    <div class="left">
-      <button class="btn" id="endless">エンドレス開始</button>
-      <button class="btn" id="new">新しい盤面</button>
-      <button class="btn" id="retry">リトライ</button>
-      <button class="btn" id="next">次へ</button>
-
-      <button class="btn" id="hard">HARD</button>
-      <button class="btn" id="hintBtn">HINT</button>
-
-      <button class="btn" id="mazeBtn">WALL</button>
-      <button class="btn" id="holeBtn">HOLE</button>
-      <button class="btn" id="warpBtn">WARP</button>
-      <button class="btn" id="warpGo">WARP!</button>
-      <button class="btn" id="keyBtn">KEY</button>
-
-      <button class="btn" id="sfx">SFX</button>
-      <button class="btn" id="bgm">BGM</button>
-
-      <span class="pill mono" id="mode">MODE: LEVEL</span>
-      <span class="pill mono" id="streak">STREAK 0</span>
-      <span class="pill mono" id="undo">UNDO ∞</span>
-      <span class="pill mono" id="wall">Wall 0%</span>
-      <span class="pill mono" id="key">KEY -</span>
-
-      <span class="pill mono" id="today">TODAY -</span>
-      <span class="pill mono" id="beststreak">BEST STREAK 0</span>
-
-      <div>
-        <div class="mono" id="status">Time 00:00.0 / Actions 0 / Par 0</div>
-        <div class="hint">点をなぞって全部踏む → スタートに戻るとCLEAR（上下左右＋ブリッジ）</div>
-        <div class="hint">HARD: 各点の「直進(━/│) / 曲がる(└)」制約。HOLE: 消える点＋ブリッジ。WARP: 2点間テレポ。KEY: 鍵でドアが開く。</div>
-        <div class="hint mono" id="best">Best: -</div>
-      </div>
+    <div class="row">
+      <div class="btn primary" id="btnEndless">エンドレス開始</div>
+      <div class="btn" id="btnNew">新しい盤面</div>
+      <div class="btn" id="btnRetry">リトライ</div>
+      <div class="btn" id="btnNext">次へ</div>
+      <div class="btn" id="btnUndo">UNDO ∞</div>
     </div>
-    <div id="clear" class="mono">CLEAR!</div>
+    <div class="right">
+      <span class="pill"><input type="checkbox" id="togHard">HARD</span>
+      <span class="pill"><input type="checkbox" id="togHint">HINT</span>
+      <span class="pill"><input type="checkbox" id="togWall">WALL</span>
+      <span class="pill"><input type="checkbox" id="togHole">HOLE</span>
+      <span class="pill"><input type="checkbox" id="togWarp">WARP</span>
+      <span class="pill"><input type="checkbox" id="togKey">KEY</span>
+      <span class="pill"><input type="checkbox" id="togSfx" checked>SFX</span>
+      <span class="pill"><input type="checkbox" id="togBgm">BGM</span>
+      <span id="clear"></span>
+    </div>
   </div>
-  <canvas id="c"></canvas>
+
+  <div class="stats">
+    <div>MODE: <span id="modeLabel">LEVEL</span></div>
+    <div>LEVEL <span id="levelLabel">1</span></div>
+    <div>STREAK <span id="streakLabel">0</span></div>
+    <div class="spacer"></div>
+    <div>Time <span id="timeLabel">00:00.0</span></div>
+    <div>/ Actions <span id="actLabel">0</span></div>
+    <div>/ Par <span id="parLabel">0</span></div>
+  </div>
+  <div class="hint">
+    点をなぞって全部踏む → スタートに戻るとCLEAR（上下左右＋ブリッジ）<br/>
+    HARD: 直進/曲がる制約。HOLE: なくなる点＋ブリッジ。WARP: 2点間テレポ。KEY: 鍵でゲート解除。
+  </div>
+
+  <div class="stage">
+    <canvas id="cv" width="900" height="900"></canvas>
+  </div>
+
+  <div class="stats">
+    <div>BEST STREAK <span id="bestLabel">0</span></div>
+    <div>TODAY <span id="todayLabel">-</span></div>
+  </div>
 </div>
 
 <script>
 (() => {
-  const canvas = document.getElementById('c');
-  const ctx = canvas.getContext('2d');
+  const ASSET_VER = "3"; // 反映されない時は数字を上げてCommit（キャッシュ回避）
+  const $ = (id)=>document.getElementById(id);
 
-  // ---- Fixed levels (練習用) ----
-  const levels = [
-    {r:2,c:4},
-    {r:3,c:4},
-    {r:4,c:4},
-    {r:3,c:6},
-    {r:4,c:6},
-  ];
-
-  // Endless pool（少なくとも片方は偶数にしてHARD制約でも必ず解けるように）
-  const endlessPool = [
-    {r:2,c:6},{r:2,c:8},{r:2,c:10},{r:2,c:12},
-    {r:3,c:6},{r:3,c:8},{r:3,c:10},{r:3,c:12},
-    {r:4,c:4},{r:4,c:6},{r:4,c:8},{r:4,c:10},{r:4,c:12},
-    {r:5,c:6},{r:5,c:8},{r:5,c:10},{r:5,c:12},
-    {r:6,c:6},{r:6,c:8},{r:6,c:10},{r:6,c:12},
-    {r:7,c:8},{r:7,c:10},{r:7,c:12},
-    {r:8,c:8},{r:8,c:10},{r:8,c:12},
-    {r:9,c:8},{r:9,c:10},{r:9,c:12},
-    {r:10,c:8},{r:10,c:10},{r:10,c:12},
-  ];
-
-  // ---- PRNG (seeded) ----
-  function mulberry32(seed){
-    let a = seed >>> 0;
-    return function(){
-      a += 0x6D2B79F5;
-      let t = a;
-      t = Math.imul(t ^ (t >>> 15), t | 1);
-      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  // ---------- Audio ----------
+  const audio = (() => {
+    const enabled = { sfx:true, bgm:false };
+    const files = {
+      bgm: `assets/bgm.mp3?v=${ASSET_VER}`,
+      start: `assets/sfx_start.mp3?v=${ASSET_VER}`,
+      step: `assets/sfx_step.mp3?v=${ASSET_VER}`,
+      undo: `assets/sfx_undo.mp3?v=${ASSET_VER}`,
+      error:`assets/sfx_error.mp3?v=${ASSET_VER}`,
+      clear:`assets/sfx_clear.mp3?v=${ASSET_VER}`,
+      key:  `assets/sfx_key.mp3?v=${ASSET_VER}`,
+      warp: `assets/sfx_warp.mp3?v=${ASSET_VER}`,
+      gate: `assets/sfx_gate.mp3?v=${ASSET_VER}`,
     };
-  }
-  function hashStrToUint(str){
-    let h = 2166136261 >>> 0;
-    for(let i=0;i<str.length;i++){
-      h ^= str.charCodeAt(i);
-      h = Math.imul(h, 16777619) >>> 0;
+
+    let unlocked = false;
+    const pool = {};
+    function make(name){
+      const a = new Audio(files[name]);
+      a.preload = "auto";
+      a.crossOrigin = "anonymous";
+      return a;
     }
-    return h >>> 0;
-  }
+    function play(name, vol=0.9){
+      if(!enabled.sfx) return;
+      if(!unlocked) return; // iPhone対策：最初の操作後だけ鳴らす
+      try{
+        if(!pool[name]) pool[name] = make(name);
+        const a = pool[name].cloneNode(true);
+        a.volume = vol;
+        a.play().catch(()=>{});
+      }catch(e){}
+    }
 
-  // ---- Audio (外部ファイル / MP3・WAV) ----
-  // 置き場所：リポジトリ直下に assets/ フォルダを作って入れる
-  // 例）assets/bgm.mp3, assets/sfx_step.mp3 ...（Safari対策でMP3推奨）
-  const ASSET_VER = '1'; // 音を差し替えたのに反映されない時は数字を上げる（キャッシュ対策）
-  const audio = { unlocked:false, bgmEl:null, pools:Object.create(null) };
+    const bgm = make("bgm");
+    bgm.loop = true;
+    bgm.volume = 0.55;
 
-  let sfxOn = (localStorage.getItem('loopline_sfx') ?? '1') === '1';
-  let bgmOn = (localStorage.getItem('loopline_bgm') ?? '0') === '1';
+    function setBgm(on){
+      enabled.bgm = on;
+      if(!on){ bgm.pause(); return; }
+      if(!unlocked) return;
+      bgm.play().catch(()=>{});
+    }
 
-  const BGM_VOL = 0.22;
-  const SFX_VOL = 0.70;
-  const SFX_POOL_SIZE = 6;
+    function unlock(){
+      if(unlocked) return;
+      unlocked = true;
+      // これで以降の音が鳴るようになる
+      if(enabled.bgm){
+        bgm.play().catch(()=>{});
+      }
+    }
+    return { enabled, play, setBgm, unlock };
+  })();
 
-  const audioFiles = {
-    // BGM（ループ用）
-    bgm: './assets/bgm.mp3',
+  // Unlock on first user gesture
+  window.addEventListener("pointerdown", ()=>audio.unlock(), {once:false, passive:true});
 
-    // SFX（短め推奨 0.05〜0.6s）
-    start: './assets/sfx_start.mp3',
-    step:  './assets/sfx_step.mp3',
-    undo:  './assets/sfx_undo.mp3',
-    error: './assets/sfx_error.mp3',
-    clear: './assets/sfx_clear.mp3',
-    key:   './assets/sfx_key.mp3',
-    warp:  './assets/sfx_warp.mp3',
-    gate:  './assets/sfx_gate.mp3',
+  // ---------- Game Model ----------
+  const LS = {
+    get(k, d){ try{ const v = localStorage.getItem(k); return v==null?d:JSON.parse(v);}catch(e){return d;} },
+    set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} },
   };
 
-  function withVer(url){
-    // GitHub Pages / iPhoneキャッシュ対策
-    return url + (url.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(ASSET_VER);
+  const UI = {
+    mode: $("modeLabel"),
+    level:$("levelLabel"),
+    streak:$("streakLabel"),
+    best:$("bestLabel"),
+    today:$("todayLabel"),
+    time:$("timeLabel"),
+    act:$("actLabel"),
+    par:$("parLabel"),
+    clear:$("clear"),
+  };
+
+  const Tog = {
+    hard:$("togHard"), hint:$("togHint"), wall:$("togWall"), hole:$("togHole"),
+    warp:$("togWarp"), key:$("togKey"), sfx:$("togSfx"), bgm:$("togBgm"),
+  };
+
+  // defaults
+  const settings = LS.get("loopline_settings", {
+    hard:false, hint:false, wall:true, hole:true, warp:true, key:true, sfx:true, bgm:false
+  });
+  Object.entries(settings).forEach(([k,v])=>{ if(Tog[k]) Tog[k].checked = !!v; });
+  audio.enabled.sfx = Tog.sfx.checked;
+  audio.setBgm(Tog.bgm.checked);
+
+  function saveSettings(){
+    const s = {
+      hard:Tog.hard.checked, hint:Tog.hint.checked, wall:Tog.wall.checked, hole:Tog.hole.checked,
+      warp:Tog.warp.checked, key:Tog.key.checked, sfx:Tog.sfx.checked, bgm:Tog.bgm.checked
+    };
+    LS.set("loopline_settings", s);
+  }
+  Object.values(Tog).forEach(el => el.addEventListener("change", ()=>{
+    audio.enabled.sfx = Tog.sfx.checked;
+    audio.setBgm(Tog.bgm.checked);
+    saveSettings();
+    // toggles affect next board generation
+    draw();
+  }));
+
+  const cv = $("cv");
+  const ctx = cv.getContext("2d");
+
+  let mode = "LEVEL"; // LEVEL or ENDLESS
+  let level = LS.get("loopline_level", 1);
+  let streak = LS.get("loopline_streak", 0);
+  let bestStreak = LS.get("loopline_best", 0);
+
+  const todayKey = new Date().toISOString().slice(0,10);
+  const todayBestKey = `loopline_todaybest_${todayKey}`;
+  let todayBest = LS.get(todayBestKey, null);
+
+  UI.best.textContent = bestStreak;
+  UI.streak.textContent = streak;
+  UI.level.textContent = level;
+  UI.mode.textContent = mode;
+  UI.today.textContent = todayBest ?? "-";
+
+  // Board state
+  let board = null;
+  let path = [];      // node ids visited in order
+  let edgesUsed = new Set(); // "a-b" normalized
+  let hasKey = false;
+
+  // stats
+  let startedAt = null;
+  let timerId = null;
+  let actions = 0;
+
+  function fmtTime(ms){
+    const t = Math.max(0, ms|0);
+    const s = t/1000;
+    const mm = Math.floor(s/60);
+    const ss = (s - mm*60);
+    const s2 = String(Math.floor(ss)).padStart(2,"0");
+    const d = Math.floor((ss - Math.floor(ss))*10);
+    return `${String(mm).padStart(2,"0")}:${s2}.${d}`;
+  }
+  function tick(){
+    if(!startedAt){ UI.time.textContent = "00:00.0"; return; }
+    UI.time.textContent = fmtTime(Date.now()-startedAt);
+  }
+  function startTimer(){
+    if(startedAt) return;
+    startedAt = Date.now();
+    timerId = setInterval(tick, 100);
+  }
+  function stopTimer(){
+    if(timerId) clearInterval(timerId);
+    timerId = null;
   }
 
-  function ensureAudio(){
-    if(audio.bgmEl) return;
+  function edgeKey(a,b){
+    return a<b ? `${a}-${b}` : `${b}-${a}`;
+  }
 
-    // BGM
-    const bgm = new Audio(withVer(audioFiles.bgm));
-    bgm.loop = true;
-    bgm.preload = 'auto';
-    bgm.volume = BGM_VOL;
-    bgm.playsInline = true;
-    audio.bgmEl = bgm;
+  function nodeId(x,y,n){ return y*n + x; }
 
-    // SFX pools
-    for(const [name, url] of Object.entries(audioFiles)){
-      if(name === 'bgm') continue;
-      const pool = [];
-      for(let i=0;i<SFX_POOL_SIZE;i++){
-        const a = new Audio(withVer(url));
-        a.preload = 'auto';
-        a.volume = SFX_VOL;
-        a.playsInline = true;
-        pool.push(a);
+  function genBaseCycle(n){
+    // Hamiltonian cycle on n x n nodes (n even), includes all nodes
+    const order = [];
+    // first row: x=0..n-1
+    for(let x=0;x<n;x++) order.push(nodeId(x,0,n));
+    // rows 1..n-1: snake excluding x=0
+    for(let y=1;y<n;y++){
+      if(y%2===1){
+        // from x=n-1 down to 1
+        for(let x=n-1;x>=1;x--) order.push(nodeId(x,y,n));
+      }else{
+        // from x=1 up to n-1
+        for(let x=1;x<n;x++) order.push(nodeId(x,y,n));
       }
-      audio.pools[name] = pool;
+    }
+    // then go to (0,n-1) and up first column to (0,1), then back to (0,0)
+    order.push(nodeId(0,n-1,n));
+    for(let y=n-2;y>=1;y--) order.push(nodeId(0,y,n));
+    // closure is implicit: last connects to first
+    return order;
+  }
+
+  function buildBoard(seed){
+    // level scaling: keep even grid
+    const base = 6;
+    const add = Math.min(6, Math.floor((level-1)/3)*2);
+    let n = base + add;
+    if(n%2===1) n++;
+    const rng = mulberry32(seed);
+
+    // nodes
+    const nodes = [];
+    for(let y=0;y<n;y++){
+      for(let x=0;x<n;x++){
+        nodes.push({ id: nodeId(x,y,n), x, y, hole:false, warp:false, key:false });
+      }
     }
 
-    // タブが非表示になったらBGM停止（復帰時は必要なら再開）
-    document.addEventListener('visibilitychange', ()=>{
-      if(!audio.bgmEl) return;
-      if(document.hidden){
-        try{ audio.bgmEl.pause(); }catch{}
-      }else{
-        if(bgmOn && audio.unlocked){
-          audio.bgmEl.play().catch(()=>{});
+    // solution cycle
+    let sol = genBaseCycle(n);
+
+    // holes: remove some "middle of straight segment" nodes; add bridge edges in solution
+    const holes = new Set();
+    const bridgeEdges = new Set(); // key "a-b" that are bridges
+    if(Tog.hole.checked){
+      const target = Math.min(6, 1 + Math.floor((level-1)/2)); // 1..6
+      let tries = 0;
+      while(holes.size < target && tries++ < 500){
+        const i = 1 + Math.floor(rng()*(sol.length-2));
+        const a = sol[(i-1+sol.length)%sol.length];
+        const h = sol[i];
+        const b = sol[(i+1)%sol.length];
+        if(holes.has(h)) continue;
+        if(holes.has(a) || holes.has(b)) continue;
+
+        const A = nodes[a], H = nodes[h], B = nodes[b];
+        // candidate: collinear and distance 2
+        const dx1 = H.x - A.x, dy1 = H.y - A.y;
+        const dx2 = B.x - H.x, dy2 = B.y - H.y;
+        if(dx1===dx2 && dy1===dy2 && Math.abs(dx1)+Math.abs(dy1)===1){
+          // A-H-B is straight with step 1; bridge will be A-B (dist 2)
+          holes.add(h);
         }
       }
-    });
-  }
-
-  async function resumeAudio(){
-    // iOS Safari: ユーザー操作内で一度 play() を成功させる必要がある
-    ensureAudio();
-    if(audio.unlocked) return;
-
-    try{
-      // 無音で一瞬だけ再生→停止（アンロック用）
-      const probe = audio.pools.start?.[0] || audio.bgmEl;
-      if(!probe) return;
-
-      const prevVol = probe.volume;
-      probe.volume = 0.0;
-      await probe.play();
-      probe.pause();
-      try{ probe.currentTime = 0; }catch{}
-      probe.volume = prevVol;
-
-      audio.unlocked = true;
-
-      // すでにBGM ONならここで開始（ユーザー操作内なので確実）
-      if(bgmOn) startBgm();
-    }catch(e){
-      // 失敗してもOK：次のユーザー操作でまた unlock を試す
+      // apply holes by removing them from solution, and connecting neighbors with bridge
+      if(holes.size){
+        const newSol = [];
+        for(let i=0;i<sol.length;i++){
+          const id = sol[i];
+          if(holes.has(id)){
+            const prev = sol[(i-1+sol.length)%sol.length];
+            const next = sol[(i+1)%sol.length];
+            // add bridge edge prev-next
+            bridgeEdges.add(edgeKey(prev,next));
+            continue;
+          }
+          newSol.push(id);
+        }
+        sol = newSol;
+      }
     }
-  }
+    holes.forEach(id => nodes[id].hole = true);
 
-  // 連打・同時再生に強いSFX再生
-  function playSfx(name){
-    if(!sfxOn) return;
-    ensureAudio();
-    const pool = audio.pools[name];
-    if(!pool || pool.length === 0) return;
-
-    // 空いてるやつを優先（なければ先頭を奪う）
-    let a = pool.find(x => x.paused || x.ended);
-    if(!a){ a = pool[0]; try{ a.pause(); }catch{} }
-
-    try{ a.currentTime = 0; }catch{}
-    a.play().catch(()=>{});
-  }
-
-  let lastErrAt = 0;
-  function sfx(name){
-    const now = performance.now();
-    if(name === 'error'){
-      if(now - lastErrAt < 160) return; // 連続ブザー抑制
-      lastErrAt = now;
+    // Build adjacency edges
+    const allow = new Map(); // id -> Set(neiId)
+    for(const nd of nodes){
+      if(nd.hole) continue;
+      allow.set(nd.id, new Set());
     }
-    playSfx(name);
-  }
-
-  function startBgm(){
-    ensureAudio();
-    if(!audio.bgmEl) return;
-    // unlocked前だとiOSが弾くので、resumeAudio() 内/ユーザー操作後に呼ばれる前提
-    audio.bgmEl.volume = BGM_VOL;
-    audio.bgmEl.play().catch(()=>{});
-  }
-
-  function stopBgm(){
-    if(!audio.bgmEl) return;
-    try{ audio.bgmEl.pause(); }catch{}
-    try{ audio.bgmEl.currentTime = 0; }catch{}
-  }
-
-  let mode = 'level'; // 'level' | 'endless'
-  let levelIndex = 0;
-
-  // Endless loop
-  let endlessBaseSeed = 0;
-  let endlessStage = 0;
-  let endlessReroll = 0;
-  let endlessStreak = 0;
-  let currentSeed = 0;
-
-  // Toggles
-  let hardMode = (localStorage.getItem('loopline_hard') ?? '0') === '1';
-  let hintMode = (localStorage.getItem('loopline_hint') ?? '1') === '1';
-
-  // complex board toggles (default ON for endless)
-  let mazeMode = (localStorage.getItem('loopline_maze') ?? '1') === '1';
-  let holeMode = (localStorage.getItem('loopline_hole') ?? '1') === '1';
-  let warpMode = (localStorage.getItem('loopline_warp') ?? '1') === '1';
-  let keyMode  = (localStorage.getItem('loopline_key')  ?? '1') === '1';
-
-  // Difficulty extras
-  const UNDO_LIMIT_HARD = 5; // ←おすすめ調整（3→5）
-  let undoRemaining = hardMode ? UNDO_LIMIT_HARD : Infinity;
-
-  // Complexity state
-  let wallDensity = 0; // 0.0〜1.0（表示用）
-  const blockedEdges = new Set(); // permanent walls
-  const bridgeEdges  = new Set(); // HOLE bridges (length 2)
-  const protectedEdges = new Set(); // edges on guaranteed cycle (so walls won't block)
-  let cycleIds = null; // ids in order for guaranteed solution (after holes)
-
-  // Warp
-  const portalPairs = new Map(); // id -> pairedId
-
-  // Key & Gate (optional route)
-  let keyNodeId = -1;
-  let keyCollected = false;
-  let gateEdge = null; // {a,b} edge unlocked by key
-  let gateUsed = false;
-
-  // HARD rule coverage (endlessで段階的に増やす)
-  let hardCoverage = 1.0; // 0.0〜1.0
-
-  // UI
-  const statusEl = document.getElementById('status');
-  const clearEl  = document.getElementById('clear');
-  const bestEl   = document.getElementById('best');
-  const modeEl   = document.getElementById('mode');
-  const streakEl = document.getElementById('streak');
-  const undoEl   = document.getElementById('undo');
-  const todayEl  = document.getElementById('today');
-  const bestStreakEl = document.getElementById('beststreak');
-  const wallEl = document.getElementById('wall');
-  const keyEl  = document.getElementById('key');
-
-  const hardBtn = document.getElementById('hard');
-  const hintBtn = document.getElementById('hintBtn');
-  const mazeBtn = document.getElementById('mazeBtn');
-  const holeBtn = document.getElementById('holeBtn');
-  const warpBtn = document.getElementById('warpBtn');
-  const warpGoBtn = document.getElementById('warpGo');
-  const keyBtn  = document.getElementById('keyBtn');
-
-  const sfxBtn  = document.getElementById('sfx');
-  const bgmBtn  = document.getElementById('bgm');
-
-  function syncToggleUI(){
-    hardBtn.classList.toggle('on', hardMode);
-    hintBtn.classList.toggle('on', hintMode);
-    mazeBtn.classList.toggle('on', mazeMode);
-    holeBtn.classList.toggle('on', holeMode);
-    warpBtn.classList.toggle('on', warpMode);
-    keyBtn.classList.toggle('on', keyMode);
-    sfxBtn.classList.toggle('on', sfxOn);
-    bgmBtn.classList.toggle('on', bgmOn);
-    // warpGo availability handled in updateWarpGoUI
-  }
-
-  // ---- feedback ----
-  const flashEl = document.getElementById('flash');
-  let lastFxAt = 0;
-  function feedbackError(){
-    sfx('error');
-    const now = performance.now();
-    if(now - lastFxAt < 120) return;
-    lastFxAt = now;
-
-    if(flashEl){
-      flashEl.style.opacity = '0.18';
-      setTimeout(() => { flashEl.style.opacity = '0'; }, 90);
+    function addEdge(a,b){
+      if(!allow.has(a) || !allow.has(b)) return;
+      allow.get(a).add(b);
+      allow.get(b).add(a);
     }
-    document.body.classList.add('shake');
-    setTimeout(() => document.body.classList.remove('shake'), 200);
 
-    if(navigator.vibrate){
-      try{ navigator.vibrate(35); }catch{}
+    // normal neighbors (4-dir)
+    for(const nd of nodes){
+      if(nd.hole) continue;
+      const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+      for(const [dx,dy] of dirs){
+        const x = nd.x+dx, y = nd.y+dy;
+        if(x<0||y<0||x>=n||y>=n) continue;
+        const id2 = nodeId(x,y,n);
+        if(nodes[id2].hole) continue;
+        addEdge(nd.id, id2);
+      }
     }
-  }
-  function feedbackClear(){
-    if(navigator.vibrate){
-      try{ navigator.vibrate([30, 40, 55]); }catch{}
+    // bridges
+    for(const k of bridgeEdges){
+      const [a,b] = k.split("-").map(Number);
+      addEdge(a,b);
     }
-  }
 
-  // ---- Utils ----
-  function pad2(n){ return String(n).padStart(2,'0'); }
-  function fmtTime(ms){
-    const s = ms/1000;
-    const m = Math.floor(s/60);
-    const rr = (s - m*60);
-    return `${pad2(m)}:${pad2(Math.floor(rr))}.${Math.floor((rr%1)*10)}`;
-  }
-  function starsText(stars){ return '★'.repeat(stars) + '☆'.repeat(3-stars); }
-  function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
-
-  function edgeKey(a,b){ return (a < b) ? `${a}-${b}` : `${b}-${a}`; }
-
-  function currentPuzzleId(){
-    const toggles = `hard=${hardMode?1:0}|hint=${hintMode?1:0}|wall=${mazeMode?1:0}|hole=${holeMode?1:0}|warp=${warpMode?1:0}|key=${keyMode?1:0}`;
-    if(mode === 'endless') return `endless:${currentSeed}:${toggles}`;
-    return `level:${levelIndex}:${rows}x${cols}:${toggles}`;
-  }
-
-  function saveBest(result){
-    const id = currentPuzzleId();
-    const key = `loopline_best_${id}`;
-    const prev = JSON.parse(localStorage.getItem(key) || 'null');
-
-    const better =
-      !prev ||
-      result.stars > prev.stars ||
-      (result.stars === prev.stars && result.timeMs < prev.timeMs) ||
-      (result.stars === prev.stars && result.timeMs === prev.timeMs && result.actions < prev.actions);
-
-    if(better){
-      localStorage.setItem(key, JSON.stringify(result));
+    // walls (block some non-solution edges)
+    const walls = new Set();
+    // solution edges set
+    const solEdges = new Set();
+    for(let i=0;i<sol.length;i++){
+      const a = sol[i];
+      const b = sol[(i+1)%sol.length];
+      solEdges.add(edgeKey(a,b));
     }
-    updateBestUI();
-  }
 
-  // Best streak (endless)
-  function bestStreakKey(){ return `loopline_best_streak_${hardMode?1:0}_${mazeMode?1:0}_${holeMode?1:0}_${warpMode?1:0}_${keyMode?1:0}`; }
-  let bestStreak = parseInt(localStorage.getItem(bestStreakKey()) || '0', 10);
-
-  // Today best (per toggles)
-  function localDateStr(){
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth()+1).padStart(2,'0');
-    const day = String(d.getDate()).padStart(2,'0');
-    return `${y}-${m}-${day}`;
-  }
-  function todayBestKey(){
-    return `loopline_today_best_${localDateStr()}_${hardMode?1:0}_${mazeMode?1:0}_${holeMode?1:0}_${warpMode?1:0}_${keyMode?1:0}`;
-  }
-
-  function updateBestUI(){
-    const id = currentPuzzleId();
-    const key = `loopline_best_${id}`;
-    const best = JSON.parse(localStorage.getItem(key) || 'null');
-    if(!best){
-      bestEl.textContent = `Best: -`;
-    }else{
-      bestEl.textContent = `Best: ${starsText(best.stars)}  Time ${fmtTime(best.timeMs)}  Actions ${best.actions}`;
+    if(Tog.wall.checked){
+      // consider all edges in allow, block some not in solution
+      const allEdges = [];
+      for(const [a, set] of allow.entries()){
+        for(const b of set){
+          if(a<b) allEdges.push([a,b]);
+        }
+      }
+      const blockRate = Math.min(0.35, 0.12 + (level-1)*0.02);
+      for(const [a,b] of allEdges){
+        const k = edgeKey(a,b);
+        if(solEdges.has(k)) continue;
+        if(bridgeEdges.has(k)) continue;
+        if(rng() < blockRate) walls.add(k);
+      }
     }
-    updateTodayUI();
-    updateBestStreakUI();
-    updateUndoUI();
-    updateWallUI();
-    updateKeyUI();
-    updateWarpGoUI();
-  }
 
-  function calcStars(timeMs, actionsCount, par){
-    const sec = timeMs/1000;
-    const k = hardMode ? 0.85 : 1.0;
-    const t3 = (8 + par * 1.10) * k;
-    const t2 = (12 + par * 1.75) * k;
-    const a3 = Math.floor((par + Math.max(0, Math.floor(par*0.05))) * k);
-    const a2 = Math.floor((par + Math.max(2, Math.floor(par*0.25))) * k);
-
-    if(actionsCount <= a3 && sec <= t3) return 3;
-    if(actionsCount <= a2 && sec <= t2) return 2;
-    return 1;
-  }
-
-  function updateStreakUI(){
-    streakEl.textContent = `STREAK ${mode==='endless' ? endlessStreak : 0}`;
-  }
-  function updateUndoUI(){
-    undoEl.textContent = `UNDO ${hardMode ? undoRemaining : '∞'}`;
-  }
-  function readTodayBest(){
-    try{ return JSON.parse(localStorage.getItem(todayBestKey()) || 'null'); }catch{ return null; }
-  }
-  function updateTodayUI(){
-    const b = readTodayBest();
-    if(!b){ todayEl.textContent = 'TODAY -'; return; }
-    todayEl.textContent = `TODAY ${starsText(b.stars)} ${fmtTime(b.timeMs)}`;
-  }
-  function updateBestStreakUI(){
-    bestStreakEl.textContent = `BEST STREAK ${bestStreak}`;
-  }
-  function saveTodayBest(result){
-    const key = todayBestKey();
-    const prev = readTodayBest();
-    const better =
-      !prev ||
-      result.stars > prev.stars ||
-      (result.stars === prev.stars && result.timeMs < prev.timeMs) ||
-      (result.stars === prev.stars && result.timeMs === prev.timeMs && result.actions < prev.actions);
-
-    if(better){
-      localStorage.setItem(key, JSON.stringify({stars:result.stars, timeMs:result.timeMs, actions:result.actions}));
+    // warp pair
+    let warpA=null, warpB=null;
+    if(Tog.warp.checked){
+      const candidates = sol.filter(id => !nodes[id].hole);
+      warpA = candidates[Math.floor(rng()*candidates.length)];
+      warpB = candidates[Math.floor(rng()*candidates.length)];
+      // ensure different and not start
+      if(warpA===warpB) warpB = candidates[(candidates.indexOf(warpA)+Math.floor(candidates.length/2))%candidates.length];
+      nodes[warpA].warp = true;
+      nodes[warpB].warp = true;
     }
-    updateTodayUI();
-  }
-  function updateWallUI(){
-    wallEl.textContent = `Wall ${Math.round(wallDensity*100)}%`;
-  }
-  
-  function canWarpNow(){
-    if(!(warpMode && mode==='endless')) return false;
-    if(!isDrawing || cleared) return false;
-    if(!portalPairs.has(lastId)) return false;
-    const toId = portalPairs.get(lastId);
-    const to = getNodeById(toId);
-    if(!to || !to.active || to.visited) return false;
-    return true;
-  }
-  function updateWarpGoUI(){
-    if(!warpGoBtn) return;
-    const ok = canWarpNow();
-    warpGoBtn.classList.toggle('on', ok);
-    warpGoBtn.disabled = !ok;
-    warpGoBtn.style.opacity = ok ? '1' : '0.45';
-  }
-function updateKeyUI(){
-    if(!keyMode || mode !== 'endless'){
-      keyEl.textContent = 'KEY -';
-      return;
+
+    // key + gate on a solution edge (requires collecting key)
+    let gateEdge=null;
+    let keyNode=null;
+    if(Tog.key.checked){
+      // pick a gate edge somewhere away from start
+      const start = sol[0];
+      const gateIdx = Math.max(4, Math.floor(sol.length*0.55));
+      const ga = sol[gateIdx%sol.length];
+      const gb = sol[(gateIdx+1)%sol.length];
+      gateEdge = edgeKey(ga, gb);
+
+      // pick key earlier along solution (reachable before gate if you go that way)
+      const keyIdx = Math.max(2, Math.floor(sol.length*0.18));
+      keyNode = sol[keyIdx%sol.length];
+      nodes[keyNode].key = true;
     }
-    const got = keyCollected ? '🔑' : '—';
-    const gate = gateEdge ? (keyCollected ? (gateUsed ? 'OPEN✓' : 'OPEN') : 'LOCK') : '-';
-    keyEl.textContent = `KEY ${got} / ${gate}`;
+
+    // HARD constraints derived from solution
+    const hardReq = new Map(); // id -> "H"|"V"|"T"
+    for(let i=0;i<sol.length;i++){
+      const prev = sol[(i-1+sol.length)%sol.length];
+      const cur  = sol[i];
+      const next = sol[(i+1)%sol.length];
+      const P = nodes[prev], C = nodes[cur], N = nodes[next];
+      const d1 = [C.x-P.x, C.y-P.y];
+      const d2 = [N.x-C.x, N.y-C.y];
+      const straight = (d1[0]===d2[0] && d1[1]===d2[1]);
+      if(straight){
+        hardReq.set(cur, d1[0]!==0 ? "H" : "V");
+      }else{
+        hardReq.set(cur, "T");
+      }
+    }
+
+    // start fixed to sol[0]
+    const startId = sol[0];
+
+    // par heuristic: nodes count + bridges + gating etc
+    const totalNodes = sol.length;
+    const par = totalNodes + (bridgeEdges.size>0?1:0) + (Tog.key.checked?1:0) + (Tog.warp.checked?1:0);
+
+    return {
+      n, nodes, allow, walls, bridgeEdges, sol, solEdges,
+      startId, warpA, warpB, keyNode, gateEdge,
+      hardReq, par
+    };
   }
 
-  // ---- Board / Geometry ----
-  function resize(){
-    DPR = Math.min(2, window.devicePixelRatio || 1);
-    W = canvas.clientWidth;
-    H = canvas.clientHeight;
-    canvas.width  = Math.floor(W * DPR);
-    canvas.height = Math.floor(H * DPR);
-    ctx.setTransform(DPR,0,0,DPR,0,0);
+  // RNG
+  function mulberry32(a){
+    let t = a >>> 0;
+    return function(){
+      t += 0x6D2B79F5;
+      let x = Math.imul(t ^ (t >>> 15), 1 | t);
+      x ^= x + Math.imul(x ^ (x >>> 7), 61 | x);
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
 
-    cell = Math.max(70, Math.min(150, Math.floor(Math.min(W/(cols+1), H/(rows+2)))));
-    touchRadius = Math.max(26, Math.floor(cell*0.28));
-    originX = Math.floor((W - (cols-1)*cell)/2);
-    originY = Math.floor((H - (rows-1)*cell)/2);
-    rebuildNodePositions();
+  function resetRun(keepBoard=false){
+    UI.clear.textContent = "";
+    stopTimer(); startedAt=null; tick();
+    actions = 0; UI.act.textContent = "0";
+    hasKey = false;
+    path = [];
+    edgesUsed = new Set();
+    if(!keepBoard){
+      const seed = (Date.now() + level*99991) >>> 0;
+      board = buildBoard(seed);
+    }
+    UI.par.textContent = board.par;
     draw();
   }
 
-  function rebuildNodePositions(){
-    for(const n of nodes){
-      n.x = originX + n.c*cell;
-      n.y = originY + n.r*cell;
-    }
+  function beginLevel(){
+    resetRun(false);
+    // start is fixed; first tap selects start and begins
   }
 
-  function getNodeById(id){ return nodes[id]; }
+  function setMode(m){
+    mode = m;
+    UI.mode.textContent = mode;
+  }
 
+  // ---------- Input / Moves ----------
   function nearestNode(px,py){
+    const { n } = board;
+    const pad = getPad();
+    const size = Math.min(cv.width, cv.height) - pad*2;
+    const step = size/(n-1);
     let best=null, bestD=1e9;
-    for(const n of nodes){
-      if(!n.active) continue;
-      const dx=n.x-px, dy=n.y-py;
-      const d=Math.hypot(dx,dy);
-      if(d < bestD){ bestD=d; best=n; }
+    for(const nd of board.nodes){
+      if(nd.hole) continue;
+      const x = pad + nd.x*step;
+      const y = pad + nd.y*step;
+      const dx = px-x, dy = py-y;
+      const d2 = dx*dx+dy*dy;
+      if(d2 < bestD){ bestD=d2; best = nd; }
     }
-    return (bestD <= touchRadius) ? best : null;
+    return { node: best, dist2: bestD, step };
   }
 
-  function visitedCount(){
+  function canTraverseEdge(a,b){
+    const k = edgeKey(a,b);
+    if(board.walls.has(k)) return false;
+    // gate blocks until key
+    if(board.gateEdge && k===board.gateEdge && !hasKey) return false;
+    return true;
+  }
+
+  function dir(a,b){
+    const A = board.nodes[a], B = board.nodes[b];
+    const dx = Math.sign(B.x - A.x);
+    const dy = Math.sign(B.y - A.y);
+    return [dx,dy];
+  }
+
+  function hardOk(nextId){
+    if(!Tog.hard.checked) return true;
+    if(path.length < 2) return true;
+    const prev = path[path.length-2];
+    const cur  = path[path.length-1];
+    const req = board.hardReq.get(cur);
+    if(!req) return true;
+    const d1 = dir(prev, cur);
+    const d2 = dir(cur, nextId);
+    const straight = (d1[0]===d2[0] && d1[1]===d2[1]);
+    if(req==="T") return !straight;
+    if(req==="H") return straight && d2[0]!==0;
+    if(req==="V") return straight && d2[1]!==0;
+    return true;
+  }
+
+  function tryMove(toId){
+    const fromId = path.length ? path[path.length-1] : null;
+    const startId = board.startId;
+
+    // first move: must start at startId (固定)
+    if(fromId==null){
+      if(toId !== startId){
+        audio.play("error", 0.8);
+        return false;
+      }
+      path.push(toId);
+      actions++; UI.act.textContent = String(actions);
+      audio.play("start", 0.9);
+      draw();
+      return true;
+    }
+
+    if(toId === fromId) return false;
+    if(path.length>1 && toId === path[path.length-2]){ // ignore tiny backtrack via drag
+      return false;
+    }
+
+    // cannot revisit nodes (except returning to start for clear at end)
+    const isVisited = path.includes(toId);
+    const allVisited = (countVisited() === countTotal());
+    if(isVisited && !(toId===startId && !allVisited)){
+      audio.play("error", 0.85);
+      return false;
+    }
+
+    // adjacency
+    const set = board.allow.get(fromId);
+    if(!set || !set.has(toId)){
+      audio.play("error", 0.8);
+      return false;
+    }
+
+    // wall/gate
+    if(!canTraverseEdge(fromId,toId)){
+      audio.play("error", 0.9);
+      return false;
+    }
+
+    // HARD constraint at current node
+    if(!hardOk(toId)){
+      audio.play("error", 0.9);
+      return false;
+    }
+
+    // move
+    if(path.length===1) startTimer();
+    path.push(toId);
+    edgesUsed.add(edgeKey(fromId,toId));
+    actions++; UI.act.textContent = String(actions);
+
+    // key pickup
+    if(board.keyNode!=null && toId===board.keyNode && !hasKey){
+      hasKey = true;
+      audio.play("key", 1.0);
+      audio.play("gate", 0.9);
+    }else{
+      audio.play("step", 0.75);
+    }
+
+    // clear?
+    if(checkClear()){
+      onClear();
+    }
+    draw();
+    return true;
+  }
+
+  function countTotal(){
     let c=0;
-    for(const n of nodes) if(n.active && n.visited) c++;
+    for(const nd of board.nodes) if(!nd.hole) c++;
     return c;
   }
-
-  function manhattan(aId,bId){
-    const a=getNodeById(aId), b=getNodeById(bId);
-    return Math.abs(a.r-b.r)+Math.abs(a.c-b.c);
+  function countVisited(){
+    const s = new Set(path);
+    return s.size;
   }
 
-  function axis(fromId, toId){
-    const a = getNodeById(fromId), b = getNodeById(toId);
-    return (a.r === b.r) ? 'H' : 'V';
+  function checkClear(){
+    if(path.length < 4) return false;
+    const startId = board.startId;
+    const cur = path[path.length-1];
+    if(cur !== startId) return false;
+    // all non-hole visited
+    return countVisited() === countTotal();
   }
 
-  function isEdgeAllowed(a,b){
-    const k = edgeKey(a,b);
-
-    // gate edge: locked until key
-    if(keyMode && mode==='endless' && gateEdge){
-      const gk = edgeKey(gateEdge.a, gateEdge.b);
-      if(k === gk){
-        return keyCollected;
-      }
-    }
-    // normal walls
-    if(blockedEdges.has(k)) return false;
-    return true;
-  }
-
-  // neighbor check: returns {ok,type} where type in 'adj'|'bridge'
-  function neighborType(aId,bId){
-    const a=getNodeById(aId), b=getNodeById(bId);
-    if(!a || !b || !a.active || !b.active) return {ok:false,type:''};
-
-    const man = Math.abs(a.r-b.r)+Math.abs(a.c-b.c);
-    if(man === 1){
-      if(!isEdgeAllowed(aId,bId)) return {ok:false,type:'adj'};
-      return {ok:true,type:'adj'};
-    }
-    // bridge (manhattan 2 straight only)
-    if(man === 2 && (a.r === b.r || a.c === b.c)){
-      if(bridgeEdges.has(edgeKey(aId,bId))) return {ok:true,type:'bridge'};
-    }
-    return {ok:false,type:''};
-  }
-
-  function ruleOk(nodeId, prevId, nextId){
-    const rule = getNodeById(nodeId).rule;
-    if(rule === 'N') return true;
-    const inAx  = axis(prevId, nodeId);
-    const outAx = axis(nodeId, nextId);
-    if(rule === 'H') return inAx === 'H' && outAx === 'H';
-    if(rule === 'V') return inAx === 'V' && outAx === 'V';
-    if(rule === 'T') return inAx !== outAx;
-    return true;
-  }
-
-  function resetRunState(){
-    undoRemaining = hardMode ? UNDO_LIMIT_HARD : Infinity;
-    updateUndoUI();
-
-    for(const n of nodes) n.visited=false;
-    isDrawing=false;
-    startId=-1; lastId=-1;
-    path=[]; segments=[];
-    moves=0; actions=0; cleared=false;
-    clearEl.style.opacity = 0;
-
-    // key state
-    keyCollected = false;
-    gateUsed = false;
-    updateKeyUI();
-    updateWarpGoUI();
-
+  function onClear(){
     stopTimer();
-    tElapsed = 0;
-    timerRunning = false;
+    UI.clear.textContent = "CLEAR!";
+    audio.play("clear", 1.0);
 
-    updateStatus(true);
-    draw();
-  }
+    // streak
+    streak += 1;
+    bestStreak = Math.max(bestStreak, streak);
+    UI.streak.textContent = String(streak);
+    UI.best.textContent = String(bestStreak);
+    LS.set("loopline_streak", streak);
+    LS.set("loopline_best", bestStreak);
 
-  function startTimerOnce(){
-    if(timerRunning) return;
-    timerRunning = true;
-    tStart = performance.now() - tElapsed;
-    if(timerInterval) clearInterval(timerInterval);
-    timerInterval = setInterval(() => {
-      if(timerRunning) tElapsed = performance.now() - tStart;
-      updateStatus(false);
-    }, 100);
-  }
-
-  function stopTimer(){
-    if(timerRunning){
-      tElapsed = performance.now() - tStart;
-    }
-    timerRunning = false;
-    if(timerInterval){
-      clearInterval(timerInterval);
-      timerInterval = null;
-    }
-  }
-
-  function updateStatus(forceDraw){
-    const par = total;
-    statusEl.textContent = `Time ${fmtTime(tElapsed)} / Actions ${actions} / Par ${par}` + (hardMode ? ` / Undo ${undoRemaining}` : ``);
-    if(forceDraw) draw();
-  }
-
-  // ---- Core generation: build guaranteed cycle on full rectangle ----
-  function buildCycleEvenRows(R, C){
-    const coords = [];
-    for(let c=0;c<C;c++) coords.push([0,c]);
-    for(let r=1;r<R;r++){
-      if(r % 2 === 1){
-        for(let c=C-1;c>=1;c--) coords.push([r,c]);
+    // today best time
+    const t = startedAt ? (Date.now()-startedAt) : null;
+    if(t!=null){
+      if(todayBest==null || t < todayBest){
+        todayBest = t;
+        LS.set(todayBestKey, todayBest);
+        UI.today.textContent = fmtTime(todayBest);
       }else{
-        for(let c=1;c<=C-1;c++) coords.push([r,c]);
-      }
-    }
-    coords.push([R-1,0]);
-    for(let r=R-2;r>=1;r--) coords.push([r,0]);
-    return coords;
-  }
-
-  function buildCycle(R,C,seed){
-    const rng = mulberry32(seed);
-    let coords;
-    const canRow = (R % 2 === 0);
-    const canCol = (C % 2 === 0);
-
-    if(canRow && (!canCol || rng() < 0.5)){
-      coords = buildCycleEvenRows(R,C);
-    }else if(canCol){
-      const t = buildCycleEvenRows(C,R);
-      coords = t.map(([rr,cc]) => [cc, rr]);
-    }else{
-      return null;
-    }
-
-    const mh = rng() < 0.5;
-    const mv = rng() < 0.5;
-    if(mh || mv){
-      coords = coords.map(([r,c]) => [mv ? (R-1-r) : r, mh ? (C-1-c) : c]);
-    }
-
-    const k = Math.floor(rng() * coords.length);
-    coords = coords.slice(k).concat(coords.slice(0,k));
-    return coords;
-  }
-
-  function coordsToIds(coords){
-    const ids = [];
-    for(const [r,c] of coords){
-      ids.push(r*cols + c);
-    }
-    return ids;
-  }
-
-  // Apply HOLE: remove some nodes on straight segments and add bridge edges
-  function applyHoles(baseCycleIds, rng){
-    bridgeEdges.clear();
-    // reset all active first
-    for(const n of nodes) n.active = true;
-
-    if(!(holeMode && mode==='endless')){ 
-      cycleIds = baseCycleIds.slice();
-      return;
-    }
-
-    const N = baseCycleIds.length;
-    const maxRate = 0.10; // max 10% removed (safe)
-    const rate = clamp(0.03 + endlessStage*0.008, 0.03, maxRate);
-    let target = Math.floor(N * rate);
-    target = clamp(target, 0, Math.floor(N*0.12));
-
-    const candidates = [];
-    for(let i=0;i<N;i++){
-      const id = baseCycleIds[i];
-      const prev = baseCycleIds[(i-1+N)%N];
-      const next = baseCycleIds[(i+1)%N];
-      const a = getNodeById(prev), b = getNodeById(id), c = getNodeById(next);
-      // straight only (prev and next aligned)
-      const straight = (a.r === c.r && b.r === a.r) || (a.c === c.c && b.c === a.c);
-      if(!straight) continue;
-      // ensure prev-next are 2 steps apart (bridge)
-      if(manhattan(prev,next) !== 2) continue;
-      candidates.push(i);
-    }
-
-    // shuffle candidates
-    for(let i=candidates.length-1;i>0;i--){
-      const j = Math.floor(rng()* (i+1));
-      const t = candidates[i]; candidates[i]=candidates[j]; candidates[j]=t;
-    }
-
-    const removedIndex = new Set();
-    for(const i of candidates){
-      if(removedIndex.size >= target) break;
-      // prevent adjacent removals in cycle
-      const im1 = (i-1+N)%N, ip1=(i+1)%N;
-      if(removedIndex.has(im1) || removedIndex.has(ip1)) continue;
-
-      removedIndex.add(i);
-    }
-
-    // deactivate removed nodes and add bridges
-    const removedIds = new Set();
-    for(const i of removedIndex){
-      const id = baseCycleIds[i];
-      removedIds.add(id);
-      getNodeById(id).active = false;
-      const prev = baseCycleIds[(i-1+N)%N];
-      const next = baseCycleIds[(i+1)%N];
-      bridgeEdges.add(edgeKey(prev,next));
-    }
-
-    // new cycle = base cycle without removed ids
-    cycleIds = baseCycleIds.filter(id => !removedIds.has(id));
-  }
-
-  // Protected edges are edges along cycleIds (including bridge edges)
-  function buildProtectedEdges(){
-    protectedEdges.clear();
-    if(!cycleIds) return;
-    const N = cycleIds.length;
-    for(let i=0;i<N;i++){
-      const a = cycleIds[i];
-      const b = cycleIds[(i+1)%N];
-      protectedEdges.add(edgeKey(a,b));
-    }
-  }
-
-  function computeRulesFromCycle(){
-    // default
-    for(const n of nodes){ if(n.active) n.rule='N'; }
-
-    if(!hardMode || !cycleIds) return;
-
-    const N = cycleIds.length;
-    for(let i=0;i<N;i++){
-      const id = cycleIds[i];
-      const prev = cycleIds[(i-1+N)%N];
-      const next = cycleIds[(i+1)%N];
-
-      let rule = 'T';
-      const a = getNodeById(prev), b = getNodeById(id), c = getNodeById(next);
-      if(!a||!b||!c) { rule='N'; }
-      else{
-        if(a.r === c.r) rule = 'H';
-        else if(a.c === c.c) rule = 'V';
-        else rule = 'T';
-      }
-      getNodeById(id).rule = rule;
-    }
-
-    // For special nodes: portals & key => rule neutral (less confusing)
-    for(const [k,_] of portalPairs){
-      const n = getNodeById(k);
-      if(n && n.active) n.rule='N';
-    }
-    if(keyNodeId >= 0){
-      const n = getNodeById(keyNodeId);
-      if(n && n.active) n.rule='N';
-    }
-
-    // hard coverage (endless only) : randomly remove some rules
-    if(mode==='endless'){
-      const rng2 = mulberry32(currentSeed ^ 0x9e3779b9);
-      for(const n of nodes){
-        if(!n.active) continue;
-        if(rng2() > hardCoverage) n.rule = 'N';
-      }
-    }
-  }
-
-  // Walls generation: block random edges except protected ones
-  function generateWalls(rng){
-    blockedEdges.clear();
-    wallDensity = 0;
-
-    if(!(mazeMode && mode==='endless')) { updateWallUI(); return; }
-
-    // wall probability increases with stage
-    const p = clamp(0.06 + endlessStage*0.012, 0.06, 0.28);
-    wallDensity = p;
-
-    function considerEdge(a,b){
-      const k = edgeKey(a,b);
-      if(protectedEdges.has(k)) return;
-      // also don't place walls around inactive nodes (visual noise)
-      if(!getNodeById(a).active || !getNodeById(b).active) return;
-      if(rng() < p) blockedEdges.add(k);
-    }
-
-    for(let r=0;r<rows;r++){
-      for(let c=0;c<cols;c++){
-        const id = r*cols + c;
-        if(c+1 < cols) considerEdge(id, id+1);
-        if(r+1 < rows) considerEdge(id, id+cols);
-      }
-    }
-    updateWallUI();
-  }
-
-  // Warp generation: add 1 portal pair (optional edge)
-  function generateWarp(rng){
-    portalPairs.clear();
-    if(!(warpMode && mode==='endless')) return;
-
-    const activeIds = nodes.filter(n=>n.active).map(n=>n.id);
-    if(activeIds.length < 18) return;
-
-    // pick far-ish nodes
-    let a=-1,b=-1;
-    const tries = 80;
-    for(let t=0;t<tries;t++){
-      const i = activeIds[Math.floor(rng()*activeIds.length)];
-      const j = activeIds[Math.floor(rng()*activeIds.length)];
-      if(i===j) continue;
-      const d = manhattan(i,j);
-      if(d < 6) continue;
-      // avoid near start cluster
-      a=i; b=j; break;
-    }
-    if(a<0 || b<0) return;
-
-    portalPairs.set(a,b);
-    portalPairs.set(b,a);
-  }
-
-  // Key + Gate: place a key node and a locked edge (not on protected edges). Unlocks after key.
-  function generateKeyGate(rng){
-    keyNodeId = -1;
-    gateEdge = null;
-    keyCollected = false;
-    gateUsed = false;
-
-    if(!(keyMode && mode==='endless')) { updateKeyUI(); return; }
-
-    const activeIds = nodes.filter(n=>n.active).map(n=>n.id);
-    if(activeIds.length < 14){ updateKeyUI(); return; }
-
-    // key on an active node (not portal)
-    for(let t=0;t<50;t++){
-      const id = activeIds[Math.floor(rng()*activeIds.length)];
-      if(portalPairs.has(id)) continue;
-      keyNodeId = id;
-      break;
-    }
-
-    // gate edge: pick an adjacent edge not protected, not blocked
-    const candidates = [];
-    for(let r=0;r<rows;r++){
-      for(let c=0;c<cols;c++){
-        const id = r*cols + c;
-        if(!getNodeById(id).active) continue;
-        if(c+1 < cols){
-          const j = id+1;
-          if(!getNodeById(j).active) {}
-          else{
-            const k = edgeKey(id,j);
-            if(!protectedEdges.has(k) && !blockedEdges.has(k)) candidates.push([id,j]);
-          }
-        }
-        if(r+1 < rows){
-          const j = id+cols;
-          if(!getNodeById(j).active) {}
-          else{
-            const k = edgeKey(id,j);
-            if(!protectedEdges.has(k) && !blockedEdges.has(k)) candidates.push([id,j]);
-          }
-        }
+        UI.today.textContent = fmtTime(todayBest);
       }
     }
 
-    if(candidates.length){
-      const [a,b] = candidates[Math.floor(rng()*candidates.length)];
-      gateEdge = {a,b};
-    }
-    updateKeyUI();
-  }
-
-  // ---- Level loading ----
-  function loadLevelByDims(r,c){
-    rows=r; cols=c;
-
-    nodes = [];
-    for(let rr=0;rr<rows;rr++){
-      for(let cc=0;cc<cols;cc++){
-        const id = rr*cols + cc;
-        nodes.push({id,r:rr,c:cc,x:0,y:0,visited:false,rule:'N',active:true});
-      }
-    }
-
-    // build solvable cycle base
-    const seed = (mode==='endless')
-      ? currentSeed
-      : hashStrToUint(`level:${levelIndex}:${rows}x${cols}`);
-
-    const cyc = buildCycle(rows, cols, seed);
-    const baseCycleIds = cyc ? coordsToIds(cyc) : null;
-
-    // apply holes -> cycleIds
-    const rng = mulberry32(seed ^ 0xA5A5A5A5);
-    if(baseCycleIds) applyHoles(baseCycleIds, rng);
-    else{
-      // no guaranteed cycle; keep all nodes active, no bridges
-      for(const n of nodes) n.active=true;
-      bridgeEdges.clear();
-      cycleIds = null;
-    }
-
-    // total active nodes
-    total = nodes.reduce((acc,n)=>acc + (n.active?1:0), 0);
-
-    buildProtectedEdges();
-
-    // difficulty curve for rules
-    hardCoverage = hardMode ? Math.min(1.0, 0.35 + endlessStage * 0.06) : 0.0;
-
-    // Walls + Warp + KeyGate
-    generateWalls(rng);
-    generateWarp(rng);
-    generateKeyGate(rng);
-
-    // Rules
-    computeRulesFromCycle();
-
-    resetRunState();
-    resize();
-    updateBestUI();
-  }
-
-  function loadLevel(idx){
-    mode = 'level';
-    levelIndex = (idx + levels.length) % levels.length;
-    const lv = levels[levelIndex];
-    modeEl.textContent = `MODE: LEVEL ${levelIndex+1}/${levels.length}`;
-    endlessStreak = 0;
-    updateStreakUI();
-    loadLevelByDims(lv.r, lv.c);
-  }
-
-  function pickEndlessDims(stage, rng){
-    const step = hardMode ? 3 : 2;
-    const targetCells = 14 + stage * step;
-    const cap = Math.min(120, targetCells + 26);
-    const candidates = endlessPool.filter(p => (p.r*p.c) <= cap);
-    const pool = candidates.length >= 3 ? candidates : endlessPool;
-
-    const sorted = [...pool].sort((a,b)=>(a.r*a.c)-(b.r*b.c));
-    const u = rng();
-    const bias = Math.pow(u, 0.55);
-    const idx = Math.floor(bias * sorted.length);
-    return sorted[Math.min(sorted.length-1, idx)];
-  }
-
-  function startEndless(){
-    mode = 'endless';
-    bestStreak = parseInt(localStorage.getItem(bestStreakKey()) || '0', 10);
-    updateBestStreakUI();
-
-    endlessBaseSeed = (crypto?.getRandomValues ? crypto.getRandomValues(new Uint32Array(1))[0] : (Date.now()>>>0));
-    endlessStage = 0;
-    endlessReroll = 0;
-    endlessStreak = 0;
-    nextEndlessBoard();
-  }
-
-  function nextEndlessBoard(){
-    currentSeed = hashStrToUint(`loopline:${endlessBaseSeed}:${endlessStage}:${endlessReroll}:${hardMode?1:0}:${mazeMode?1:0}:${holeMode?1:0}:${warpMode?1:0}:${keyMode?1:0}`);
-    const rng = mulberry32(currentSeed);
-    const dims = pickEndlessDims(endlessStage, rng);
-    modeEl.textContent = `MODE: ENDLESS  Stage ${endlessStage+1}  Seed ${currentSeed}`;
-    loadLevelByDims(dims.r, dims.c);
-    updateStreakUI();
-  }
-
-  // ---- Input ----
-  function pointerPos(e){
-    const rect = canvas.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  }
-
-  // WARP (manual): portal上で WARP! を押すと、相方へテレポ
-  function doWarp(){
-    if(!canWarpNow()) return false;
-    const fromId = lastId;
-    const toId = portalPairs.get(fromId);
-
-    // Commit warp as a step
-    segments.push({a:fromId, b:toId, type:'warp'});
-    const to = getNodeById(toId);
-    to.visited = true;
-    path.push(toId);
-    lastId = toId;
-    moves += 1;
-    actions += 1;
-    sfx('warp');
-    onVisitSpecial(toId);
-    updateStatus(true);
-    updateWarpGoUI();
-    return true;
-  }
-
-
-  function onVisitSpecial(nodeId){
-    if(keyMode && mode==='endless' && nodeId === keyNodeId && !keyCollected){
-      keyCollected = true;
-      sfx('key');
-      updateKeyUI();
+    // auto next in LEVEL
+    if(mode==="LEVEL"){
+      setTimeout(()=>{ nextLevel(); }, 550);
     }
   }
 
-  function tryStartOrStep(px,py){
-    if(cleared) return;
-    const n = nearestNode(px,py);
-    if(!n) return;
-
-    if(!isDrawing){
-      resetRunState();
-      isDrawing=true;
-      startId=n.id;
-      lastId=n.id;
-      n.visited=true;
-      path=[n.id];
-      startTimerOnce();
-      sfx('start');
-      onVisitSpecial(n.id);
-      updateStatus(true);
-
-      updateWarpGoUI();
-      return;
+  function undo(){
+    if(path.length<=1) return;
+    const last = path.pop();
+    const prev = path[path.length-1];
+    if(prev!=null){
+      edgesUsed.delete(edgeKey(prev,last));
     }
-    tryStepToNode(n);
-  }
-
-  function tryStepToNode(n){
-    if(!isDrawing || cleared) return;
-    if(n.id === lastId) return;
-
-    // Undo（直前に戻る）
-    if(path.length >= 2 && n.id === path[path.length-2]){
-      if(hardMode && undoRemaining <= 0){ feedbackError(); return; }
-      if(hardMode) undoRemaining -= 1;
-      updateUndoUI();
-
-      segments.pop();
-      const last = path.pop();
-      getNodeById(last).visited=false;
-      lastId = path[path.length-1];
-      moves = Math.max(0, moves-1);
-      sfx('undo');
-      updateStatus(true);
-      updateWarpGoUI();
-      return;
+    // if undo over key pickup, recompute hasKey by presence in path
+    if(board.keyNode!=null){
+      hasKey = path.includes(board.keyNode);
     }
-
-    // Close loop（最後にスタートへ戻る）
-    const closeOk = (n.id === startId && path.length >= 4);
-    if(closeOk){
-      const nb = neighborType(lastId, startId);
-      if(!nb.ok) { feedbackError(); return; }
-      if(visitedCount() !== total) { feedbackError(); return; }
-
-      if(hardMode){
-        if(path.length >= 2){
-          const prevId = path[path.length-2];
-          if(!ruleOk(lastId, prevId, startId)){ feedbackError(); return; }
-        }
-        const secondId = path[1];
-        if(secondId != null){
-          if(!ruleOk(startId, lastId, secondId)){ feedbackError(); return; }
-        }
-      }
-
-      segments.push({a:lastId, b:startId, type:nb.type});
-      moves += 1;
-      actions += 1;
-
-      cleared = true;
-      isDrawing = false;
-      stopTimer();
-      clearEl.style.opacity = 1;
-
-      const par = total;
-      const stars = calcStars(tElapsed, actions, par);
-      clearEl.textContent = `CLEAR! ${starsText(stars)}  Time ${fmtTime(tElapsed)}  Actions ${actions} (Par ${par})`;
-
-      saveBest({stars, timeMs: Math.round(tElapsed), actions});
-      saveTodayBest({stars, timeMs: Math.round(tElapsed), actions});
-      sfx('clear');
-      feedbackClear();
-      updateStatus(true);
-
-      if(mode === 'endless'){
-        endlessStreak += 1;
-        updateStreakUI();
-        if(endlessStreak > bestStreak){
-          bestStreak = endlessStreak;
-          localStorage.setItem(bestStreakKey(), String(bestStreak));
-          updateBestStreakUI();
-        }
-        endlessStage += 1;
-        endlessReroll = 0;
-        setTimeout(() => { nextEndlessBoard(); }, 850);
-      }
-      return;
-    }
-
-    // Normal step
-    if(n.visited) { feedbackError(); return; }
-
-    const nb = neighborType(lastId, n.id);
-    if(!nb.ok) { feedbackError(); return; }
-
-    // HARD constraint on leaving lastId
-    if(hardMode && path.length >= 2){
-      const prevId = path[path.length-2];
-      if(!ruleOk(lastId, prevId, n.id)){ feedbackError(); return; }
-    }
-
-    // gate used?
-    if(keyMode && mode==='endless' && gateEdge){
-      if(edgeKey(lastId, n.id) === edgeKey(gateEdge.a, gateEdge.b) && keyCollected){
-        gateUsed = true;
-        sfx('gate');
-        updateKeyUI();
-      }
-    }
-
-    segments.push({a:lastId, b:n.id, type:nb.type});
-    n.visited=true;
-    path.push(n.id);
-    lastId = n.id;
-    moves += 1;
-    actions += 1;
-    sfx('step');
-
-    onVisitSpecial(n.id);
-
-    updateStatus(true);
-    updateWarpGoUI();
-  }
-
-  function tryStep(px,py){
-    if(!isDrawing || cleared) return;
-    const n = nearestNode(px,py);
-    if(!n) return;
-    tryStepToNode(n);
-  }
-
-  let pointerDown=false;
-  canvas.addEventListener('pointerdown', async (e)=>{
-    pointerDown=true;
-    canvas.setPointerCapture(e.pointerId);
-    await resumeAudio();
-    const p = pointerPos(e);
-    tryStartOrStep(p.x,p.y);
-  });
-  canvas.addEventListener('pointermove', (e)=>{
-    if(!pointerDown) return;
-    const p = pointerPos(e);
-    tryStep(p.x,p.y);
-  });
-  canvas.addEventListener('pointerup', ()=>{ pointerDown=false; });
-  canvas.addEventListener('pointercancel', ()=>{ pointerDown=false; });
-
-  // ---- Buttons ----
-  document.getElementById('retry').addEventListener('click', async ()=>{
-    await resumeAudio();
-    if(mode === 'endless') endlessStreak = 0;
-    updateStreakUI();
-    loadLevelByDims(rows, cols);
-  });
-
-  document.getElementById('new').addEventListener('click', async ()=>{
-    await resumeAudio();
-    if(mode === 'endless'){
-      endlessStreak = 0;
-      endlessReroll += 1;
-      nextEndlessBoard();
-    }else{
-      loadLevelByDims(rows, cols);
-    }
-    updateStreakUI();
-  });
-
-  document.getElementById('next').addEventListener('click', async ()=>{
-    await resumeAudio();
-    if(mode === 'endless'){
-      endlessStreak = 0;
-      endlessStage += 1;
-      endlessReroll = 0;
-      nextEndlessBoard();
-    }else{
-      loadLevel(levelIndex+1);
-    }
-    updateStreakUI();
-  });
-
-  document.getElementById('endless').addEventListener('click', async ()=>{
-    await resumeAudio();
-    startEndless();
-  });
-
-  hardBtn.addEventListener('click', async ()=>{
-    await resumeAudio();
-    hardMode = !hardMode;
-    localStorage.setItem('loopline_hard', hardMode ? '1':'0');
-    bestStreak = parseInt(localStorage.getItem(bestStreakKey()) || '0', 10);
-    updateBestStreakUI();
-    syncToggleUI();
-    if(mode === 'endless'){ endlessReroll += 1; nextEndlessBoard(); }
-    else{ loadLevelByDims(rows, cols); }
-  });
-
-  hintBtn.addEventListener('click', async ()=>{
-    await resumeAudio();
-    hintMode = !hintMode;
-    localStorage.setItem('loopline_hint', hintMode ? '1':'0');
-    syncToggleUI();
+    actions++; UI.act.textContent = String(actions);
+    audio.play("undo", 0.85);
+    UI.clear.textContent = "";
     draw();
+  }
+
+  // WARP action: if standing on warp node, teleport to other warp node (unvisited)
+  function warp(){
+    if(!board.warpA || !board.warpB) return;
+    if(path.length<1) return;
+    const cur = path[path.length-1];
+    let dest = null;
+    if(cur===board.warpA) dest = board.warpB;
+    if(cur===board.warpB) dest = board.warpA;
+    if(dest==null) { audio.play("error", 0.85); return; }
+    if(path.includes(dest)) { audio.play("error", 0.85); return; }
+    // teleport (no edge used)
+    path.push(dest);
+    actions++; UI.act.textContent = String(actions);
+    audio.play("warp", 1.0);
+    draw();
+  }
+
+  // ---------- UI buttons ----------
+  $("btnUndo").addEventListener("click", undo);
+  $("btnRetry").addEventListener("click", ()=>{
+    streak = 0; UI.streak.textContent = "0"; LS.set("loopline_streak", 0);
+    resetRun(true);
+  });
+  $("btnNew").addEventListener("click", ()=>resetRun(false));
+  $("btnNext").addEventListener("click", ()=>nextLevel());
+  $("btnEndless").addEventListener("click", ()=>{
+    setMode("ENDLESS");
+    streak = 0; UI.streak.textContent = "0"; LS.set("loopline_streak", 0);
+    level = 1; UI.level.textContent = "1";
+    beginLevel();
   });
 
-  mazeBtn.addEventListener('click', async ()=>{
-    await resumeAudio();
-    mazeMode = !mazeMode;
-    localStorage.setItem('loopline_maze', mazeMode ? '1':'0');
-    syncToggleUI();
-    if(mode === 'endless'){ endlessReroll += 1; nextEndlessBoard(); }
-    else{ loadLevelByDims(rows, cols); }
-  });
+  // double-tap/click on canvas to warp if enabled
+  let lastTap = 0;
+  cv.addEventListener("pointerdown", (e)=>{
+    const rect = cv.getBoundingClientRect();
+    const x = (e.clientX-rect.left) * (cv.width/rect.width);
+    const y = (e.clientY-rect.top)  * (cv.height/rect.height);
 
-  holeBtn.addEventListener('click', async ()=>{
-    await resumeAudio();
-    holeMode = !holeMode;
-    localStorage.setItem('loopline_hole', holeMode ? '1':'0');
-    syncToggleUI();
-    if(mode === 'endless'){ endlessReroll += 1; nextEndlessBoard(); }
-    else{ loadLevelByDims(rows, cols); }
-  });
-
-  warpBtn.addEventListener('click', async ()=>{
-    await resumeAudio();
-    warpMode = !warpMode;
-    localStorage.setItem('loopline_warp', warpMode ? '1':'0');
-    syncToggleUI();
-    if(mode === 'endless'){ endlessReroll += 1; nextEndlessBoard(); }
-    else{ loadLevelByDims(rows, cols); }
-  });
-
-  warpGoBtn.addEventListener('click', async ()=>{
-    await resumeAudio();
-    doWarp();
-  });
-
-  keyBtn.addEventListener('click', async ()=>{
-    await resumeAudio();
-    keyMode = !keyMode;
-    localStorage.setItem('loopline_key', keyMode ? '1':'0');
-    syncToggleUI();
-    if(mode === 'endless'){ endlessReroll += 1; nextEndlessBoard(); }
-    else{ loadLevelByDims(rows, cols); }
-  });
-
-  sfxBtn.addEventListener('click', async ()=>{
-    await resumeAudio();
-    sfxOn = !sfxOn;
-    localStorage.setItem('loopline_sfx', sfxOn ? '1':'0');
-    syncToggleUI();
-    if(sfxOn) sfx('start');
-  });
-
-  bgmBtn.addEventListener('click', async ()=>{
-    await resumeAudio();
-    bgmOn = !bgmOn;
-    localStorage.setItem('loopline_bgm', bgmOn ? '1':'0');
-    syncToggleUI();
-    if(bgmOn) startBgm(); else stopBgm();
-  });
-
-  // ---- Render ----
-  function draw(){
-    ctx.clearRect(0,0,W,H);
-
-    // background subtle grid
-    ctx.globalAlpha = 0.10;
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1;
-    for(let x=0;x<=W;x+=cell){
-      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+    const now = Date.now();
+    if(now - lastTap < 280 && Tog.warp.checked){
+      warp();
+      lastTap = 0;
+      return;
     }
-    for(let y=0;y<=H;y+=cell){
-      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+    lastTap = now;
+
+    const { node, dist2, step } = nearestNode(x,y);
+    const r = Math.max(16, step*0.18);
+    if(node && dist2 <= (r*r*1.25)){
+      tryMove(node.id);
+    }
+    dragging = true;
+    cv.setPointerCapture(e.pointerId);
+  }, {passive:true});
+
+  let dragging = false;
+  cv.addEventListener("pointermove", (e)=>{
+    if(!dragging) return;
+    const rect = cv.getBoundingClientRect();
+    const x = (e.clientX-rect.left) * (cv.width/rect.width);
+    const y = (e.clientY-rect.top)  * (cv.height/rect.height);
+    const { node, dist2, step } = nearestNode(x,y);
+    const r = Math.max(16, step*0.18);
+    if(node && dist2 <= (r*r*1.25)){
+      tryMove(node.id);
+    }
+  }, {passive:true});
+
+  cv.addEventListener("pointerup", (e)=>{
+    dragging = false;
+    try{ cv.releasePointerCapture(e.pointerId); }catch{}
+  }, {passive:true});
+
+  // ---------- Rendering ----------
+  function resizeCanvas(){
+    const rect = cv.getBoundingClientRect();
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = Math.max(320, Math.floor(rect.width * dpr));
+    const h = w; // square
+    if(cv.width!==w || cv.height!==h){
+      cv.width = w;
+      cv.height = h;
+    }
+  }
+  window.addEventListener("resize", ()=>{ resizeCanvas(); draw(); });
+
+  function getPad(){
+    return Math.round(Math.min(cv.width, cv.height)*0.09);
+  }
+
+  function draw(){
+    if(!board) return;
+    resizeCanvas();
+
+    const { n } = board;
+    const pad = getPad();
+    const size = Math.min(cv.width, cv.height) - pad*2;
+    const step = size/(n-1);
+
+    ctx.clearRect(0,0,cv.width,cv.height);
+
+    // background grid dots faint
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = "#ffffff";
+    for(const nd of board.nodes){
+      if(nd.hole) continue;
+      const x = pad + nd.x*step;
+      const y = pad + nd.y*step;
+      ctx.beginPath(); ctx.arc(x,y,2.2,0,Math.PI*2); ctx.fill();
     }
     ctx.globalAlpha = 1;
 
-    // walls
-    if(mazeMode && blockedEdges.size){
-      ctx.save();
-      ctx.globalAlpha = 0.9;
-      ctx.strokeStyle = '#2b3a66';
-      ctx.lineWidth = Math.max(6, Math.floor(cell*0.08));
-      ctx.lineCap = 'round';
-      const len = Math.max(10, Math.floor(cell*0.20));
-      for(const k of blockedEdges){
-        const [as, bs] = k.split('-');
-        const a = getNodeById(parseInt(as,10));
-        const b = getNodeById(parseInt(bs,10));
-        if(!a || !b) continue;
-        const mx = (a.x + b.x) / 2;
-        const my = (a.y + b.y) / 2;
-        ctx.beginPath();
-        if(a.r === b.r){
-          ctx.moveTo(mx, my - len/2);
-          ctx.lineTo(mx, my + len/2);
-        }else{
-          ctx.moveTo(mx - len/2, my);
-          ctx.lineTo(mx + len/2, my);
-        }
-        ctx.stroke();
-      }
-      ctx.restore();
+    // draw walls (blocked edges)
+    ctx.lineWidth = Math.max(3, step*0.07);
+    ctx.strokeStyle = "rgba(255,255,255,.10)";
+    for(const k of board.walls){
+      const [a,b] = k.split("-").map(Number);
+      const A = board.nodes[a], B = board.nodes[b];
+      const ax = pad + A.x*step, ay = pad + A.y*step;
+      const bx = pad + B.x*step, by = pad + B.y*step;
+      ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
     }
 
-    // gate edge (locked/unlocked)
-    if(keyMode && mode==='endless' && gateEdge){
-      const a = getNodeById(gateEdge.a), b = getNodeById(gateEdge.b);
-      if(a && b && a.active && b.active){
-        ctx.save();
-        ctx.globalAlpha = 1.0;
-        ctx.strokeStyle = keyCollected ? '#7CFFB2' : '#ff6b6b';
-        ctx.lineWidth = Math.max(7, Math.floor(cell*0.09));
-        ctx.lineCap = 'round';
-        const mx = (a.x + b.x) / 2;
-        const my = (a.y + b.y) / 2;
-        const len = Math.max(10, Math.floor(cell*0.22));
-        ctx.beginPath();
-        if(a.r === b.r){
-          ctx.moveTo(mx, my - len/2);
-          ctx.lineTo(mx, my + len/2);
-        }else{
-          ctx.moveTo(mx - len/2, my);
-          ctx.lineTo(mx + len/2, my);
-        }
-        ctx.stroke();
-        ctx.restore();
+    // gate edge
+    if(board.gateEdge){
+      const [a,b] = board.gateEdge.split("-").map(Number);
+      const A = board.nodes[a], B = board.nodes[b];
+      const ax = pad + A.x*step, ay = pad + A.y*step;
+      const bx = pad + B.x*step, by = pad + B.y*step;
+      ctx.lineWidth = Math.max(6, step*0.10);
+      ctx.strokeStyle = hasKey ? "rgba(124,255,124,.55)" : "rgba(255,107,107,.55)";
+      ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
+    }
+
+    // draw bridge edges (dashed)
+    ctx.lineWidth = Math.max(4, step*0.08);
+    ctx.strokeStyle = "rgba(110,231,255,.22)";
+    ctx.setLineDash([Math.max(6, step*0.18), Math.max(5, step*0.12)]);
+    for(const k of board.bridgeEdges){
+      const [a,b] = k.split("-").map(Number);
+      const A = board.nodes[a], B = board.nodes[b];
+      const ax = pad + A.x*step, ay = pad + A.y*step;
+      const bx = pad + B.x*step, by = pad + B.y*step;
+      ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    // hint: show solution edges lightly
+    if(Tog.hint.checked){
+      ctx.lineWidth = Math.max(3, step*0.06);
+      ctx.strokeStyle = "rgba(124,255,124,.14)";
+      for(const k of board.solEdges){
+        const [a,b] = k.split("-").map(Number);
+        const A = board.nodes[a], B = board.nodes[b];
+        if(A.hole||B.hole) continue;
+        const ax = pad + A.x*step, ay = pad + A.y*step;
+        const bx = pad + B.x*step, by = pad + B.y*step;
+        ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
       }
     }
 
-    // bridges (over holes)
-    if(holeMode && bridgeEdges.size){
-      ctx.save();
-      ctx.globalAlpha = 0.35;
-      ctx.strokeStyle = '#7aa7ff';
-      ctx.lineWidth = Math.max(4, Math.floor(cell*0.05));
-      ctx.setLineDash([8,8]);
-      for(const k of bridgeEdges){
-        const [as, bs] = k.split('-');
-        const a = getNodeById(parseInt(as,10));
-        const b = getNodeById(parseInt(bs,10));
-        if(!a || !b || !a.active || !b.active) continue;
-        ctx.beginPath();
-        ctx.moveTo(a.x,a.y);
-        ctx.lineTo(b.x,b.y);
-        ctx.stroke();
-      }
-      ctx.setLineDash([]);
-      ctx.restore();
-    }
-
-    // segments
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = Math.max(10, Math.floor(cell*0.10));
-    ctx.strokeStyle = cleared ? '#7CFFB2' : '#7aa7ff';
-    for(const s of segments){
-      const a=getNodeById(s.a), b=getNodeById(s.b);
-      if(!a||!b) continue;
-      ctx.beginPath();
-      ctx.moveTo(a.x,a.y);
-      ctx.lineTo(b.x,b.y);
-      ctx.stroke();
-    }
-
-    // HOLE markers (inactive nodes)
-    if(holeMode){
-      ctx.save();
-      for(const n of nodes){
-        if(n.active) continue;
-        const r = Math.max(10, Math.floor(cell*0.11));
-        ctx.beginPath();
-        ctx.arc(n.x,n.y,r,0,Math.PI*2);
-        ctx.globalAlpha = 0.35;
-        ctx.fillStyle = '#000000';
-        ctx.fill();
-        ctx.globalAlpha = 0.55;
-        ctx.strokeStyle = '#2b3a66';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      }
-      ctx.restore();
+    // used edges
+    ctx.lineWidth = Math.max(6, step*0.12);
+    ctx.strokeStyle = "#d7d9e2";
+    ctx.lineCap = "round";
+    for(const k of edgesUsed){
+      const [a,b] = k.split("-").map(Number);
+      const A = board.nodes[a], B = board.nodes[b];
+      const ax = pad + A.x*step, ay = pad + A.y*step;
+      const bx = pad + B.x*step, by = pad + B.y*step;
+      ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by); ctx.stroke();
     }
 
     // nodes
-    for(const n of nodes){
-      if(!n.active) continue;
-      const r = Math.max(12, Math.floor(cell*0.14));
-      ctx.beginPath();
-      ctx.arc(n.x,n.y,r,0,Math.PI*2);
+    const visited = new Set(path);
+    for(const nd of board.nodes){
+      if(nd.hole) continue;
+      const x = pad + nd.x*step;
+      const y = pad + nd.y*step;
+      const r = Math.max(10, step*0.12);
 
-      if(n.id === startId){
-        ctx.fillStyle = n.visited ? '#ffe27a' : '#fff2b3';
-      }else if(keyMode && mode==='endless' && n.id === keyNodeId){
-        ctx.fillStyle = keyCollected ? '#7CFFB2' : '#ffd166';
-      }else if(warpMode && mode==='endless' && portalPairs.has(n.id)){
-        ctx.fillStyle = n.visited ? '#d6c7ff' : '#f0e6ff';
-      }else{
-        ctx.fillStyle = n.visited ? '#cfe0ff' : '#ffffff';
-      }
+      // base
+      ctx.beginPath();
+      ctx.fillStyle = visited.has(nd.id) ? "rgba(255,255,255,.95)" : "rgba(255,255,255,.25)";
+      ctx.arc(x,y,r,0,Math.PI*2);
       ctx.fill();
 
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = n.visited ? '#1a2440' : '#2b3a66';
-      ctx.stroke();
-
-      // portal ring
-      if(warpMode && mode==='endless' && portalPairs.has(n.id)){
-        ctx.beginPath();
-        ctx.arc(n.x,n.y, r+6, 0, Math.PI*2);
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = '#a78bfa';
-        ctx.stroke();
+      // special: start ring
+      if(nd.id===board.startId){
+        ctx.lineWidth = Math.max(3, step*0.06);
+        ctx.strokeStyle = "rgba(124,255,124,.85)";
+        ctx.beginPath(); ctx.arc(x,y,r+3,0,Math.PI*2); ctx.stroke();
       }
 
-      // HARD rule indicator
-      if(hardMode){
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = '#1a2440';
-        const s = Math.max(6, Math.floor(r*0.62));
-        if(n.rule === 'H'){
-          ctx.beginPath();
-          ctx.moveTo(n.x - s, n.y);
-          ctx.lineTo(n.x + s, n.y);
-          ctx.stroke();
-        }else if(n.rule === 'V'){
-          ctx.beginPath();
-          ctx.moveTo(n.x, n.y - s);
-          ctx.lineTo(n.x, n.y + s);
-          ctx.stroke();
-        }else if(n.rule === 'T'){
-          ctx.beginPath();
-          ctx.moveTo(n.x - s*0.7, n.y);
-          ctx.lineTo(n.x, n.y);
-          ctx.lineTo(n.x, n.y + s*0.7);
-          ctx.stroke();
-        }
+      // warp mark
+      if(nd.warp && Tog.warp.checked){
+        ctx.fillStyle = "rgba(110,231,255,.95)";
+        ctx.beginPath(); ctx.arc(x,y,Math.max(4, r*0.35),0,Math.PI*2); ctx.fill();
+      }
+
+      // key mark
+      if(nd.key && Tog.key.checked && !hasKey){
+        ctx.fillStyle = "rgba(255,229,124,.95)";
+        ctx.beginPath(); ctx.arc(x,y,Math.max(4, r*0.35),0,Math.PI*2); ctx.fill();
       }
     }
 
-    // next-move hint highlight (optional)
-    if(hintMode && isDrawing && !cleared){
-      const candidates = [];
-      const prevId = path.length >= 2 ? path[path.length-2] : -1;
-
-      for(const n of nodes){
-        if(!n.active || n.visited) continue;
-
-        const nb = neighborType(lastId, n.id);
-        if(!nb.ok) continue;
-
-        // HARDなら「直前ノードの制約」も満たすものだけ
-        if(hardMode && prevId >= 0){
-          if(!ruleOk(lastId, prevId, n.id)) continue;
-        }
-        candidates.push(n);
+    // HARD glyphs
+    if(Tog.hard.checked){
+      ctx.font = `${Math.max(12, step*0.18)}px system-ui`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = "rgba(255,255,255,.55)";
+      for(const [id, req] of board.hardReq.entries()){
+        const nd = board.nodes[id];
+        if(nd.hole) continue;
+        const x = pad + nd.x*step;
+        const y = pad + nd.y*step;
+        const g = req==="H" ? "━" : (req==="V" ? "│" : "└");
+        ctx.fillText(g, x, y);
       }
-
-      ctx.globalAlpha = 0.20;
-      for(const n of candidates){
-        const rr = Math.max(18, Math.floor(cell*0.18));
-        ctx.beginPath();
-        ctx.arc(n.x, n.y, rr, 0, Math.PI*2);
-        ctx.fillStyle = '#ffffff';
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
     }
   }
 
-  window.addEventListener('resize', resize);
+  function nextLevel(){
+    if(mode==="LEVEL"){
+      level += 1;
+      LS.set("loopline_level", level);
+      UI.level.textContent = String(level);
+      beginLevel();
+      return;
+    }
+    // endless: regenerate harder board as "level"
+    level += 1;
+    UI.level.textContent = String(level);
+    beginLevel();
+  }
 
-  // Boot
-  syncToggleUI();
-  if(bgmOn) startBgm();
-  updateTodayUI();
-  updateBestStreakUI();
-  updateUndoUI();
-  updateWallUI();
-  updateKeyUI();
-  loadLevel(0);
-  updateWarpGoUI();
+  // Initialize
+  setMode("LEVEL");
+  beginLevel();
+
 })();
 </script>
 </body>
-</html>
+</html> 
